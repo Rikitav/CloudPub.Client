@@ -195,6 +195,15 @@ app.MapGet("/", () => "Hello from CloudPub!");
 app.Run();
 ```
 
+### CloudPubEndpointsBuilder
+
+```
+builder.Services.AddCloudPub(builder.Configuration.GetSection("CloudPub"));
+builder.Services.AddPublishEndpoint(builder => builder
+    .AddPublishEndpoint(port: 5010, name: "Sample site")
+    .AddPublishEndpoint(port: 5020, name: "Sample site 2"));
+```
+
 **Requirements:** a server that exposes **`IServerAddressesFeature`** (Kestrel does). The hosted service throws at startup if the feature is missing.
 
 ---
