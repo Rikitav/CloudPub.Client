@@ -4,6 +4,17 @@
         <name>CloudPub.AspNet</name>
     </assembly>
     <members>
+        <member name="T:CloudPub.CloudPubEndpointsBuilder">
+            <inheritdoc/>
+        </member>
+        <member name="F:CloudPub.CloudPubEndpointsBuilder.Endpoints">
+            <summary>
+            Final list of endpoints.
+            </summary>
+        </member>
+        <member name="M:CloudPub.CloudPubEndpointsBuilder.AddPublishEndpoint(CloudPub.Options.CloudPubPublishOptions)">
+            <inheritdoc/>
+        </member>
         <member name="T:CloudPub.HostedCloudPubLifecycleService">
             <summary>
             Hosted service that connects the CloudPub client during host startup, publishes configured endpoints,
@@ -53,10 +64,23 @@
         <member name="M:CloudPub.HostedCloudPubLifecycleService.StoppedAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="T:CloudPub.ICloudPubClientBuilder">
+        <member name="T:CloudPub.ICloudPubEndpointsBuilder">
             <summary>
-            Marker interface reserved for future fluent configuration of the CloudPub client in ASP.NET Core applications.
+            Provides a contract for configuring and adding publish endpoints for cloud-based messaging services.
             </summary>
+            <remarks>
+            Implementations of this interface allow developers to specify options for publishing messages to cloud services.
+            Endpoints added through this builder should be properly configured to ensure reliable message delivery.</remarks>
+        </member>
+        <member name="M:CloudPub.ICloudPubEndpointsBuilder.AddPublishEndpoint(CloudPub.Options.CloudPubPublishOptions)">
+            <summary>
+            Adds a publish endpoint to the builder using the specified cloud publishing options.
+            </summary>
+            <remarks>
+            Use this method to configure cloud publishing for the application.
+            Ensure that all required properties of the options parameter are set to valid values to avoid configuration errors at runtime.
+            </remarks>
+            <param name="publishOptions">The options that configure the publish endpoint, including target environment, authentication, and other publishing settings. Cannot be null.</param>
         </member>
         <member name="T:CloudPub.ServiceCollectionExtensions">
             <summary>
@@ -95,15 +119,24 @@
             <param name="optionsConfiguration">Configuration section or root for client options.</param>
             <returns>The same collection for chaining.</returns>
         </member>
-        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,CloudPub.Options.CloudPubPublishOptions)">
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Action{CloudPub.ICloudPubEndpointsBuilder})">
             <summary>
             Registers a publish profile so <see cref="T:CloudPub.HostedCloudPubLifecycleService"/> publishes it at application startup.
             </summary>
             <param name="services">The service collection.</param>
-            <param name="options">Endpoint description to publish.</param>
+            <param name="builder">Endpoint builder.</param>
             <returns>The same collection for chaining.</returns>
         </member>
-        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.UInt16,System.String,CloudPub.Protocol.ProtocolType)">
+        <member name="T:CloudPub.CloudPubEndpointsBuilderExtensions">
+            <summary>
+            Provides extension methods for registering publish endpoints with a cloud publishing service builder.
+            </summary>
+            <remarks>
+            These extension methods enable the configuration of publish endpoints using various specifications, such as local TCP ports, string addresses, or protocol-specific defaults.
+            They support optional naming and protocol type selection, allowing for flexible endpoint registration in cloud-based applications.
+            </remarks>
+        </member>
+        <member name="M:CloudPub.CloudPubEndpointsBuilderExtensions.AddPublishEndpoint(CloudPub.ICloudPubEndpointsBuilder,System.UInt16,System.String,CloudPub.Protocol.ProtocolType)">
             <summary>
             Registers an HTTP (or other) endpoint on <c>localhost</c> at the given port.
             </summary>
@@ -113,7 +146,7 @@
             <param name="protocolType">Application protocol; defaults to HTTP.</param>
             <returns>The same collection for chaining.</returns>
         </member>
-        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.String,CloudPub.Protocol.ProtocolType)">
+        <member name="M:CloudPub.CloudPubEndpointsBuilderExtensions.AddPublishEndpoint(CloudPub.ICloudPubEndpointsBuilder,System.String,System.String,CloudPub.Protocol.ProtocolType)">
             <summary>
             Registers a publish profile using a string address (port, host:port, path, or URL depending on protocol).
             </summary>
@@ -123,7 +156,7 @@
             <param name="protocolType">Application protocol; defaults to HTTP.</param>
             <returns>The same collection for chaining.</returns>
         </member>
-        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,CloudPub.Protocol.ProtocolType)">
+        <member name="M:CloudPub.CloudPubEndpointsBuilderExtensions.AddPublishEndpoint(CloudPub.ICloudPubEndpointsBuilder,System.String,CloudPub.Protocol.ProtocolType)">
             <summary>
             Registers a publish profile with empty address; useful when the address is supplied elsewhere or protocol-specific defaults apply.
             </summary>

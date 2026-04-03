@@ -70,14 +70,27 @@ public static class ServiceCollectionExtensions
     /// Registers a publish profile so <see cref="HostedCloudPubLifecycleService"/> publishes it at application startup.
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="options">Endpoint description to publish.</param>
+    /// <param name="builder">Endpoint builder.</param>
     /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, CloudPubPublishOptions options)
+    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, Action<ICloudPubEndpointsBuilder> builder)
     {
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(CloudPubPublishOptions), options, ServiceLifetime.Singleton));
+        CloudPubEndpointsBuilder endPointsBuilder = new CloudPubEndpointsBuilder();
+        builder.Invoke(endPointsBuilder);
+
+        services.TryAddSingleton<IEnumerable<CloudPubPublishOptions>>(instance: endPointsBuilder.Endpoints.ToArray());
         return services;
     }
+}
 
+/// <summary>
+/// Provides extension methods for registering publish endpoints with a cloud publishing service builder.
+/// </summary>
+/// <remarks>
+/// These extension methods enable the configuration of publish endpoints using various specifications, such as local TCP ports, string addresses, or protocol-specific defaults.
+/// They support optional naming and protocol type selection, allowing for flexible endpoint registration in cloud-based applications.
+/// </remarks>
+public static class CloudPubEndpointsBuilderExtensions
+{
     /// <summary>
     /// Registers an HTTP (or other) endpoint on <c>localhost</c> at the given port.
     /// </summary>
@@ -86,7 +99,7 @@ public static class ServiceCollectionExtensions
     /// <param name="name">Optional description for the published endpoint.</param>
     /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
     /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, ushort port, string? name = null, ProtocolType protocolType = ProtocolType.Http)
+    public static ICloudPubEndpointsBuilder AddPublishEndpoint(this ICloudPubEndpointsBuilder services, ushort port, string? name = null, ProtocolType protocolType = ProtocolType.Http)
     {
         return services.AddPublishEndpoint(new CloudPubPublishOptions()
         {
@@ -105,7 +118,7 @@ public static class ServiceCollectionExtensions
     /// <param name="name">Optional description for the published endpoint.</param>
     /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
     /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, string address, string? name = null, ProtocolType protocolType = ProtocolType.Http)
+    public static ICloudPubEndpointsBuilder AddPublishEndpoint(this ICloudPubEndpointsBuilder services, string address, string? name = null, ProtocolType protocolType = ProtocolType.Http)
     {
         return services.AddPublishEndpoint(new CloudPubPublishOptions()
         {
@@ -123,7 +136,7 @@ public static class ServiceCollectionExtensions
     /// <param name="name">Optional description for the published endpoint.</param>
     /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
     /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, string? name = null, ProtocolType protocolType = ProtocolType.Http)
+    public static ICloudPubEndpointsBuilder AddPublishEndpoint(this ICloudPubEndpointsBuilder services, string? name = null, ProtocolType protocolType = ProtocolType.Http)
     {
         return services.AddPublishEndpoint(new CloudPubPublishOptions()
         {

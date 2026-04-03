@@ -512,6 +512,13 @@
             </summary>
             <param name="ep">Server endpoint metadata from a protocol message.</param>
         </member>
+        <member name="M:CloudPub.TypesExtensions.ToLocalEndpointUrl(CloudPub.Protocol.ClientEndpoint)">
+            <summary>
+            Formats a <see cref="T:CloudPub.Protocol.ClientEndpoint"/> int url string like <c>http://localhost:8080/path</c>, omitting port when zero and path when empty.
+            </summary>
+            <param name="clientEndpoint"></param>
+            <returns></returns>
+        </member>
         <member name="M:CloudPub.TypesExtensions.ToHostAndPort(System.Uri)">
             <summary>
             Formats a URI as <c>host:port</c>, normalizing default HTTP/HTTPS ports when the port is omitted.

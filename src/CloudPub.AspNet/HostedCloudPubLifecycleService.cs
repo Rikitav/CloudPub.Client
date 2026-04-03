@@ -37,9 +37,12 @@ public class HostedCloudPubLifecycleService(ILogger<HostedCloudPubLifecycleServi
     {
         IServerAddressesFeature? addressesFeature = server.Features.Get<IServerAddressesFeature>();
         if (addressesFeature == null)
-            throw new InvalidOperationException("Сервер не поддерживает IServerAddressesFeature.");
+            throw new InvalidOperationException("Server does not support IServerAddressesFeature.");
 
         await client.ConnectAsync(cancellationToken);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("CloudPub client connected");
+
         foreach (CloudPubPublishOptions publishOptions in serviceProvider.GetServices<CloudPubPublishOptions>())
         {
             try
