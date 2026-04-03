@@ -13,6 +13,8 @@ public class TcpDataChannelRelay : IDataChannelRelay
 
     /// <inheritdoc />
     public uint ChannelId { get; }
+
+    /// <inheritdoc />
     public uint TotalConsumed { get; private set; }
 
     private TcpDataChannelRelay(uint channelId, NetworkStream stream)

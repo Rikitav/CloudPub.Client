@@ -119,6 +119,43 @@
             <param name="optionsConfiguration">Configuration section or root for client options.</param>
             <returns>The same collection for chaining.</returns>
         </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,CloudPub.Options.CloudPubPublishOptions)">
+            <summary>
+            Registers a publish profile so <see cref="T:CloudPub.HostedCloudPubLifecycleService"/> publishes it at application startup.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="publishOptions">Publish options.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.UInt16,System.String,CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Registers an HTTP (or other) endpoint on <c>localhost</c> at the given port.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="port">Local TCP port to expose.</param>
+            <param name="name">Optional description for the published endpoint.</param>
+            <param name="protocolType">Application protocol; defaults to HTTP.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.String,CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Registers a publish profile using a string address (port, host:port, path, or URL depending on protocol).
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="address">Local bind specification as accepted by <see cref="M:CloudPub.CloudPubClientOptionsExtensions.CreateCleintEndpoint(CloudPub.Options.CloudPubPublishOptions)"/>.</param>
+            <param name="name">Optional description for the published endpoint.</param>
+            <param name="protocolType">Application protocol; defaults to HTTP.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Registers a publish profile with empty address; useful when the address is supplied elsewhere or protocol-specific defaults apply.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="name">Optional description for the published endpoint.</param>
+            <param name="protocolType">Application protocol; defaults to HTTP.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
         <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Action{CloudPub.ICloudPubEndpointsBuilder})">
             <summary>
             Registers a publish profile so <see cref="T:CloudPub.HostedCloudPubLifecycleService"/> publishes it at application startup.

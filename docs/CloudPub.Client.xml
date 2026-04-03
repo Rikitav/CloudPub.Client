@@ -12,6 +12,9 @@
         <member name="P:CloudPub.ChannelRelays.TcpDataChannelRelay.ChannelId">
             <inheritdoc />
         </member>
+        <member name="P:CloudPub.ChannelRelays.TcpDataChannelRelay.TotalConsumed">
+            <inheritdoc />
+        </member>
         <member name="M:CloudPub.ChannelRelays.TcpDataChannelRelay.CreateAsync(System.UInt32,System.String,System.UInt32,System.Threading.CancellationToken)">
             <summary>
             Connects to <paramref name="localAddr"/>:<paramref name="localPort"/> and wraps the stream in a relay instance.
@@ -33,6 +36,9 @@
             </summary>
         </member>
         <member name="P:CloudPub.ChannelRelays.UdpDataChannelRelay.ChannelId">
+            <inheritdoc />
+        </member>
+        <member name="P:CloudPub.ChannelRelays.UdpDataChannelRelay.TotalConsumed">
             <inheritdoc />
         </member>
         <member name="M:CloudPub.ChannelRelays.UdpDataChannelRelay.CreateAsync(System.UInt32,System.String,System.UInt32,System.Threading.CancellationToken)">
@@ -122,6 +128,11 @@
         <member name="P:CloudPub.Components.IDataChannelRelay.ChannelId">
             <summary>
             Gets the server-assigned channel identifier for this relay.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Components.IDataChannelRelay.TotalConsumed">
+            <summary>
+            Gets the total amount consumed, represented as an unsigned integer.
             </summary>
         </member>
         <member name="M:CloudPub.Components.IDataChannelRelay.WriteAsync(System.Byte[],System.Threading.CancellationToken)">

@@ -195,7 +195,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
                 DataChannelAck = new DataChannelAck
                 {
                     ChannelId = channelId,
-                    Consumed = uint
+                    Consumed = totalConsumed
                 }
             };
 

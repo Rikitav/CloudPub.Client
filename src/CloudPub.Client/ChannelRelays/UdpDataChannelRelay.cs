@@ -14,6 +14,9 @@ public class UdpDataChannelRelay : IDataChannelRelay
     /// <inheritdoc />
     public uint ChannelId { get; }
 
+    /// <inheritdoc />
+    public uint TotalConsumed { get; private set; }
+
     private UdpDataChannelRelay(uint channelId, UdpClient udpClient)
     {
         ChannelId = channelId;
@@ -47,6 +50,7 @@ public class UdpDataChannelRelay : IDataChannelRelay
         {
             await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             await _udpClient.SendAsync(data, data.Length).ConfigureAwait(false);
+            TotalConsumed += (uint)data.Length;
         }
         finally
         {
