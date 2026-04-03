@@ -1,5 +1,6 @@
 using CloudPub.Components;
 using CloudPub.Options;
+using CloudPub.Protocol;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,7 +45,8 @@ public class HostedCloudPubLifecycleService(ILogger<HostedCloudPubLifecycleServi
             try
             {
                 Endpoint registeredEndpoint = await client.PublishAsync(publishOptions, cancellationToken);
-                addressesFeature.Addresses.Add(registeredEndpoint.Url);
+                ClientEndpoint clientEndpoint = publishOptions.CreateCleintEndpoint();
+                addressesFeature.Addresses.Add(clientEndpoint.ToLocalEndpointUrl());
 
                 registeredEndpoints.Add(registeredEndpoint);
                 if (logger.IsEnabled(LogLevel.Information))

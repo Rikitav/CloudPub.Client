@@ -165,6 +165,20 @@ public static class TypesExtensions
     }
 
     /// <summary>
+    /// Formats a <see cref="ClientEndpoint"/> int url string like <c>http://localhost:8080/path</c>, omitting port when zero and path when empty.
+    /// </summary>
+    /// <param name="clientEndpoint"></param>
+    /// <returns></returns>
+    public static string ToLocalEndpointUrl(this ClientEndpoint clientEndpoint)
+    {
+        string scheme = clientEndpoint.LocalProto.ToWireName();
+        string host = clientEndpoint.LocalAddr.Contains(':') ? $"[{clientEndpoint.LocalAddr}]" : clientEndpoint.LocalAddr;
+        string portPart = clientEndpoint.LocalPort != 0 ? $":{clientEndpoint.LocalPort}" : string.Empty;
+        string pathPart = !string.IsNullOrEmpty(clientEndpoint.LocalPath) ? clientEndpoint.LocalPath : string.Empty;
+        return $"{scheme}://{host}{portPart}{pathPart}";
+    }
+
+    /// <summary>
     /// Formats a URI as <c>host:port</c>, normalizing default HTTP/HTTPS ports when the port is omitted.
     /// </summary>
     /// <param name="url">The base URI (typically the CloudPub server URL).</param>
