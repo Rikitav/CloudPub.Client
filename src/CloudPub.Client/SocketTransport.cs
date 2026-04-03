@@ -1,13 +1,18 @@
-﻿using CloudPub.Components;
+using CloudPub.Components;
 using CloudPub.Options;
 using Google.Protobuf;
-using Protocol;
+using CloudPub.Protocol;
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 
 namespace CloudPub;
 
+/// <summary>
+/// WebSocket-based transport that performs the agent handshake, sends binary protobuf frames,
+/// and runs a receive loop dispatching messages to an <see cref="CloudPub.Components.IMessageExchanger"/>.
+/// </summary>
+/// <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
 public class SocketTransport(CloudPubClientOptions options) : ISocketTransport
 {
     private const string DefaultClientVersion = "3.0.2";
@@ -20,8 +25,16 @@ public class SocketTransport(CloudPubClientOptions options) : ISocketTransport
     private ClientWebSocket? _socket = null;
     private Task? _receiveTask;
 
+    /// <summary>
+    /// Gets the options this transport was constructed with (token may be updated after handshake).
+    /// </summary>
     public CloudPubClientOptions Options => _options;
 
+    /// <summary>
+    /// Connects to the CloudPub WebSocket endpoint, completes the agent hello/ack handshake (following redirects),
+    /// and stores the session token on success.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     [DebuggerStepThrough]
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
@@ -66,6 +79,12 @@ public class SocketTransport(CloudPubClientOptions options) : ISocketTransport
         }
     }
 
+    /// <summary>
+    /// Starts the background receive loop and optionally sends <c>EndpointStartAll</c> when
+    /// <see cref="CloudPub.Options.CloudPubClientOptions.ResumeEndpointsOnConnect"/> is enabled.
+    /// </summary>
+    /// <param name="exchanger">Handler for each decoded inbound message.</param>
+    /// <param name="cancellationToken">A token to cancel the receive loop.</param>
     [DebuggerStepThrough]
     public async Task StartReceivingAsync(IMessageExchanger exchanger, CancellationToken cancellationToken = default)
     {
@@ -74,6 +93,11 @@ public class SocketTransport(CloudPubClientOptions options) : ISocketTransport
             await SendAsync(new Message { EndpointStartAll = new EndpointStartAll() }, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Sends a single binary-encoded protobuf message over the open WebSocket.
+    /// </summary>
+    /// <param name="message">The message to serialize and send.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     [DebuggerStepThrough]
     public async Task SendAsync(Message message, CancellationToken cancellationToken = default)
     {
@@ -179,6 +203,9 @@ public class SocketTransport(CloudPubClientOptions options) : ISocketTransport
         }
     }
 
+    /// <summary>
+    /// Sends a graceful stop message when possible, closes the WebSocket, and releases transport resources.
+    /// </summary>
     [DebuggerStepThrough]
     public async ValueTask DisposeAsync()
     {

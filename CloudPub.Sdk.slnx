@@ -1,0 +1,5 @@
+﻿<Solution>
+  <Project Path="src/CloudPub.Client/CloudPub.Client.csproj" />
+  <Project Path="src/CloudPub.Example/CloudPub.Example.csproj" />
+  <Project Path="src/CloudPub.AspNet/CloudPub.AspNet.csproj" />
+</Solution>

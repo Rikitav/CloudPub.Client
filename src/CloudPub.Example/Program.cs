@@ -1,5 +1,5 @@
 using CloudPub.Options;
-using Protocol;
+using CloudPub.Protocol;
 
 namespace CloudPub.Example;
 

@@ -1,14 +1,110 @@
 using CloudPub.Components;
 using CloudPub.Options;
-using Protocol;
+using CloudPub.Protocol;
+using ProtocolType = CloudPub.Protocol.ProtocolType;
 
 namespace CloudPub;
 
+/// <summary>
+/// Exception thrown when the CloudPub server returns an error, the handshake fails, or an unexpected protocol condition occurs.
+/// </summary>
+/// <param name="message">The error message.</param>
+/// <param name="inner">The inner exception, if any.</param>
 public sealed class CloudPubException(string message, Exception? inner = null)
     : Exception(message, inner);
 
+/// <summary>
+/// High-level operations for <see cref="CloudPub.Components.ICloudPubClient"/>: publish, stop, unpublish, list, and clear endpoints.
+/// </summary>
+public static class CloudPubClientExtensions
+{
+    /// <summary>
+    /// Starts exposing a local service through CloudPub using the specified publish options.
+    /// </summary>
+    /// <param name="client">The connected client.</param>
+    /// <param name="options">Local binding, protocol, and metadata for the new endpoint.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The registered endpoint description returned by the server.</returns>
+    public static async Task<Endpoint> PublishAsync(this ICloudPubClient client, CloudPubPublishOptions options, CancellationToken cancellationToken = default)
+    {
+        Message responce = await client.ExchangeAsync(
+            new Message { EndpointStart = options.CreateCleintEndpoint() },
+            [Message.MessageOneofCase.EndpointAck],
+            cancellationToken).ConfigureAwait(false);
+
+        return responce.EndpointAck.ToEndpoint();
+    }
+
+    /// <summary>
+    /// Stops traffic for an endpoint without removing its registration.
+    /// </summary>
+    /// <param name="client">The connected client.</param>
+    /// <param name="endpoint">The endpoint to stop.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    public static async Task StopAsync(this ICloudPubClient client, Endpoint endpoint, CancellationToken cancellationToken = default)
+    {
+        await client.ExchangeAsync(
+            new Message { EndpointStop = new EndpointStop { Guid = endpoint.Guid } },
+            [Message.MessageOneofCase.EndpointAck],
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Removes an endpoint registration and marks the in-memory <paramref name="endpoint"/> status as offline.
+    /// </summary>
+    /// <param name="client">The connected client.</param>
+    /// <param name="endpoint">The endpoint to remove.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    public static async Task UnpublishAsync(this ICloudPubClient client, Endpoint endpoint, CancellationToken cancellationToken = default)
+    {
+        await client.ExchangeAsync(
+            new Message { EndpointRemove = new EndpointRemove { Guid = endpoint.Guid } },
+            [Message.MessageOneofCase.EndpointRemoveAck],
+            cancellationToken).ConfigureAwait(false);
+
+        endpoint.Status = "offline";
+    }
+
+    /// <summary>
+    /// Clears all endpoint registrations on the server.
+    /// </summary>
+    /// <param name="client">The connected client.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    public static async Task CleanAsync(this ICloudPubClient client, CancellationToken cancellationToken = default)
+    {
+        await client.ExchangeAsync(
+            new Message { EndpointClear = new EndpointClear() },
+            [Message.MessageOneofCase.EndpointClearAck],
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Returns the current list of registered endpoints from the server.
+    /// </summary>
+    /// <param name="client">The connected client.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A sequence of endpoint descriptors.</returns>
+    public static async Task<IEnumerable<Endpoint>> ListAsync(this ICloudPubClient client, CancellationToken cancellationToken = default)
+    {
+        Message message = await client.ExchangeAsync(
+            new Message { EndpointList = new EndpointList() },
+            [Message.MessageOneofCase.EndpointListAck],
+            cancellationToken).ConfigureAwait(false);
+
+        return message.EndpointListAck.Endpoints.Select(x => x.ToEndpoint());
+    }
+}
+
+/// <summary>
+/// Helpers for protocol wire names, default ports, URI construction, and host/port formatting.
+/// </summary>
 public static class TypesExtensions
 {
+    /// <summary>
+    /// Returns the wire-format protocol name used in URLs and API payloads.
+    /// </summary>
+    /// <param name="protocol">The protocol enum value.</param>
+    /// <returns>A lowercase identifier (e.g. <c>http</c>, <c>tcp</c>).</returns>
     public static string ToWireName(this ProtocolType protocol) => protocol switch
     {
         ProtocolType.Http => "http",
@@ -25,6 +121,10 @@ public static class TypesExtensions
         _ => "unknown"
     };
 
+    /// <summary>
+    /// Returns a common default port for well-known protocols, or <c>null</c> when none is defined.
+    /// </summary>
+    /// <param name="protocol">The protocol enum value.</param>
     public static uint? DefaultPort(this ProtocolType protocol) => protocol switch
     {
         ProtocolType.Http => 80,
@@ -37,6 +137,10 @@ public static class TypesExtensions
         _ => null
     };
 
+    /// <summary>
+    /// Builds a <see cref="Uri"/> for the public remote address of a <see cref="ServerEndpoint"/>.
+    /// </summary>
+    /// <param name="ep">Server endpoint metadata from a protocol message.</param>
     public static Uri ToEndpointUri(this ServerEndpoint ep)
     {
         ProtocolType proto = ep.RemoteProto;
@@ -44,6 +148,10 @@ public static class TypesExtensions
         return new Uri($"{wire}://{ep.RemoteAddr}:{ep.RemotePort}");
     }
 
+    /// <summary>
+    /// Maps a <see cref="ServerEndpoint"/> to the library's <see cref="Endpoint"/> view model.
+    /// </summary>
+    /// <param name="ep">Server endpoint metadata from a protocol message.</param>
     public static Endpoint ToEndpoint(this ServerEndpoint ep)
     {
         return new Endpoint
@@ -56,6 +164,10 @@ public static class TypesExtensions
         };
     }
 
+    /// <summary>
+    /// Formats a URI as <c>host:port</c>, normalizing default HTTP/HTTPS ports when the port is omitted.
+    /// </summary>
+    /// <param name="url">The base URI (typically the CloudPub server URL).</param>
     public static string ToHostAndPort(this Uri url)
         => $"{GetHost(url)}:{GetPort(url)}";
 
@@ -63,8 +175,18 @@ public static class TypesExtensions
     private static int GetPort(Uri serverUri) => serverUri.IsDefaultPort ? (serverUri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ? 80 : 443) : serverUri.Port;
 }
 
+/// <summary>
+/// Helpers to wait for and filter messages from an <see cref="CloudPub.Components.IMessageExchanger"/>.
+/// </summary>
 public static class MessageExchangerExtensions
 {
+    /// <summary>
+    /// Waits until a message whose kind is one of <paramref name="types"/> is available, skipping others.
+    /// </summary>
+    /// <param name="exchanger">The message source.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <param name="types">Accepted message kinds.</param>
+    /// <returns>The first matching message.</returns>
     public static async ValueTask<Message> WaitMessageOfType(this IMessageExchanger exchanger, CancellationToken cancellationToken, params Message.MessageOneofCase[] types)
     {
         while (true)
@@ -77,14 +199,30 @@ public static class MessageExchangerExtensions
         }
     }
 
+    /// <summary>
+    /// Reads from the asynchronous stream and returns the first message whose kind is in <paramref name="types"/>,
+    /// or <c>null</c> if the stream ends before a match.
+    /// </summary>
+    /// <param name="exchanger">The message source.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <param name="types">Accepted message kinds.</param>
     public static async ValueTask<Message?> ReadMessageOfType(this IMessageExchanger exchanger, CancellationToken cancellationToken, params Message.MessageOneofCase[] types)
     {
         return await exchanger.ReadMessagesAsync().FirstOrDefaultAsync(msg => types.Contains(msg.MessageCase), cancellationToken);
     }
 }
 
+/// <summary>
+/// Builds a protobuf <see cref="ClientEndpoint"/> from high-level <see cref="CloudPub.Options.CloudPubPublishOptions"/>.
+/// </summary>
 public static class CloudPubClientOptionsExtensions
 {
+    /// <summary>
+    /// Converts publish options into a <see cref="ClientEndpoint"/> suitable for <c>EndpointStart</c> messages,
+    /// supporting both URL-style and shorthand address formats.
+    /// </summary>
+    /// <param name="options">User-specified protocol, address, auth, and optional rules.</param>
+    /// <returns>The configured local endpoint description.</returns>
     public static ClientEndpoint CreateCleintEndpoint(this CloudPubPublishOptions options)
     {
         AuthType resolvedAuth = options.Auth ?? (options.Protocol == ProtocolType.Webdav ? AuthType.Basic : AuthType.None);
@@ -95,7 +233,7 @@ public static class CloudPubClientOptionsExtensions
             throw new ArgumentException($"Invalid URL: {options.Address}", nameof(options.Address));
 
         string scheme = url.Scheme;
-        if (!Enum.TryParse(scheme, true, out ProtocolType _))
+        if (!System.Enum.TryParse(scheme, true, out ProtocolType _))
             throw new ArgumentException($"Invalid protocol scheme: {scheme}", nameof(options.Address));
 
         string host = url.Host.TrimStart('[').TrimEnd(']');

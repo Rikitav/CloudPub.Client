@@ -1,0 +1,1111 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>CloudPub.Client</name>
+    </assembly>
+    <members>
+        <member name="T:CloudPub.ChannelRelays.TcpDataChannelRelay">
+            <summary>
+            <see cref="T:CloudPub.Components.IDataChannelRelay"/> implementation that forwards tunneled bytes to a local TCP socket.
+            </summary>
+        </member>
+        <member name="P:CloudPub.ChannelRelays.TcpDataChannelRelay.ChannelId">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.ChannelRelays.TcpDataChannelRelay.CreateAsync(System.UInt32,System.String,System.UInt32,System.Threading.CancellationToken)">
+            <summary>
+            Connects to <paramref name="localAddr"/>:<paramref name="localPort"/> and wraps the stream in a relay instance.
+            </summary>
+            <param name="channelId">Server-assigned channel id.</param>
+            <param name="localAddr">Hostname or IP of the local service.</param>
+            <param name="localPort">TCP port of the local service.</param>
+            <param name="cancellationToken">A token to cancel the connect operation.</param>
+        </member>
+        <member name="M:CloudPub.ChannelRelays.TcpDataChannelRelay.WriteAsync(System.Byte[],System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.ChannelRelays.TcpDataChannelRelay.DisposeAsync">
+            <inheritdoc />
+        </member>
+        <member name="T:CloudPub.ChannelRelays.UdpDataChannelRelay">
+            <summary>
+            <see cref="T:CloudPub.Components.IDataChannelRelay"/> implementation that forwards tunneled datagrams to a local UDP socket.
+            </summary>
+        </member>
+        <member name="P:CloudPub.ChannelRelays.UdpDataChannelRelay.ChannelId">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.ChannelRelays.UdpDataChannelRelay.CreateAsync(System.UInt32,System.String,System.UInt32,System.Threading.CancellationToken)">
+            <summary>
+            Binds an outbound UDP association to <paramref name="localAddr"/>:<paramref name="localPort"/>.
+            </summary>
+            <param name="channelId">Server-assigned channel id.</param>
+            <param name="localAddr">Hostname or IP of the local UDP service.</param>
+            <param name="localPort">UDP port of the local service.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.ChannelRelays.UdpDataChannelRelay.WriteAsync(System.Byte[],System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.ChannelRelays.UdpDataChannelRelay.DisposeAsync">
+            <inheritdoc />
+        </member>
+        <member name="T:CloudPub.CloudPubClient">
+            <summary>
+            Default implementation of <see cref="T:CloudPub.Components.ICloudPubClient"/> that connects over WebSocket,
+            exchanges protocol messages, and manages local data-channel relays.
+            </summary>
+        </member>
+        <member name="M:CloudPub.CloudPubClient.#ctor(CloudPub.Options.CloudPubClientOptions)">
+            <summary>
+            Initializes a new instance of the <see cref="T:CloudPub.CloudPubClient"/> class.
+            </summary>
+            <param name="options">Connection and agent configuration.</param>
+        </member>
+        <member name="M:CloudPub.CloudPubClient.ConnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Establishes the WebSocket session and starts the receive loop for inbound messages.
+            </summary>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.CloudPubClient.ExchangeAsync(CloudPub.Protocol.Message,CloudPub.Protocol.Message.MessageOneofCase[],System.Threading.CancellationToken)">
+            <summary>
+            Sends a request message and waits asynchronously for the first response whose
+            <see cref="P:CloudPub.Protocol.Message.MessageCase"/> matches one of the specified cases.
+            </summary>
+            <param name="request">The outbound message to send.</param>
+            <param name="types">One or more expected response message kinds.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <returns>The first matching response message.</returns>
+        </member>
+        <member name="M:CloudPub.CloudPubClient.Purge">
+            <summary>
+            Deletes the local on-disk cache directory used by the client under the user's application data folder.
+            </summary>
+        </member>
+        <member name="M:CloudPub.CloudPubClient.DisposeAsync">
+            <summary>
+            Releases all resources used by the <see cref="T:CloudPub.CloudPubClient"/> asynchronously.
+            </summary>
+        </member>
+        <member name="M:CloudPub.CloudPubClient.Dispose">
+            <summary>
+            Releases all resources used by the <see cref="T:CloudPub.CloudPubClient"/>.
+            </summary>
+        </member>
+        <member name="T:CloudPub.Components.ICloudPubClient">
+            <summary>
+            Abstraction for a CloudPub agent client that maintains a server connection and performs
+            request/response exchanges over the CloudPub protocol.
+            </summary>
+        </member>
+        <member name="M:CloudPub.Components.ICloudPubClient.ConnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Establishes the connection and begins processing inbound protocol messages.
+            </summary>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.Components.ICloudPubClient.ExchangeAsync(CloudPub.Protocol.Message,CloudPub.Protocol.Message.MessageOneofCase[],System.Threading.CancellationToken)">
+            <summary>
+            Sends a message and waits for a response matching one of the specified message kinds.
+            </summary>
+            <param name="request">The message to send.</param>
+            <param name="types">Allowed response message kinds.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <returns>The first received message whose kind is in <paramref name="types"/>.</returns>
+        </member>
+        <member name="T:CloudPub.Components.IDataChannelRelay">
+            <summary>
+            Abstraction for forwarding bytes between CloudPub data channels and a local TCP or UDP socket.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Components.IDataChannelRelay.ChannelId">
+            <summary>
+            Gets the server-assigned channel identifier for this relay.
+            </summary>
+        </member>
+        <member name="M:CloudPub.Components.IDataChannelRelay.WriteAsync(System.Byte[],System.Threading.CancellationToken)">
+            <summary>
+            Writes data to the underlying local connection.
+            </summary>
+            <param name="data">Payload received from the tunnel.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="T:CloudPub.Components.IMessageExchanger">
+            <summary>
+            Decodes inbound protocol traffic and dispatches work to socket sends and local relays.
+            </summary>
+        </member>
+        <member name="M:CloudPub.Components.IMessageExchanger.WaitForMessagesAsync(System.Threading.CancellationToken)">
+            <summary>
+            Waits until the pending message queue may have items to read.
+            </summary>
+            <param name="cancellationToken">A token to cancel the wait.</param>
+        </member>
+        <member name="M:CloudPub.Components.IMessageExchanger.ReadMessagesAsync(System.Threading.CancellationToken)">
+            <summary>
+            Enumerates messages queued for application-level consumption.
+            </summary>
+            <param name="cancellationToken">A token to cancel enumeration.</param>
+        </member>
+        <member name="M:CloudPub.Components.IMessageExchanger.HandleMessage(CloudPub.Components.ISocketTransport,CloudPub.Protocol.Message,System.Threading.CancellationToken)">
+            <summary>
+            Processes one inbound message from the server.
+            </summary>
+            <param name="socket">Transport for sending replies.</param>
+            <param name="messgae">The received message.</param>
+            <param name="cancellationToken">A token to cancel outbound operations.</param>
+        </member>
+        <member name="T:CloudPub.Components.IRelaysManager">
+            <summary>
+            Manages per-channel relays that connect CloudPub data channels to local services.
+            </summary>
+        </member>
+        <member name="M:CloudPub.Components.IRelaysManager.CreateDataChannel(System.UInt32,CloudPub.Protocol.ServerEndpoint,System.Threading.CancellationToken)">
+            <summary>
+            Opens a relay for an incoming data channel targeting a local <see cref="T:CloudPub.Protocol.ServerEndpoint"/>.
+            </summary>
+            <param name="channelId">Server-assigned channel id.</param>
+            <param name="endpoint">Local bind/connect parameters from the server.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.Components.IRelaysManager.WriteDataChannel(System.UInt32,System.Byte[],System.Threading.CancellationToken)">
+            <summary>
+            Forwards tunneled bytes to the relay for <paramref name="channelId"/>.
+            </summary>
+            <param name="channelId">Target channel id.</param>
+            <param name="data">Payload to write locally.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.Components.IRelaysManager.DeleteDataChannel(System.UInt32,System.Threading.CancellationToken)">
+            <summary>
+            Tears down and disposes the relay for <paramref name="channelId"/>.
+            </summary>
+            <param name="channelId">Channel id to close.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="T:CloudPub.Components.ISocketTransport">
+            <summary>
+            Abstraction over the CloudPub agent connection (typically a WebSocket) used to send and receive protobuf messages.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Components.ISocketTransport.Options">
+            <summary>
+            Gets the client options associated with this transport.
+            </summary>
+        </member>
+        <member name="M:CloudPub.Components.ISocketTransport.ConnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Establishes the connection and completes the handshake.
+            </summary>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.Components.ISocketTransport.StartReceivingAsync(CloudPub.Components.IMessageExchanger,System.Threading.CancellationToken)">
+            <summary>
+            Starts receiving messages and dispatching them to <paramref name="exchanger"/>.
+            </summary>
+            <param name="exchanger">Handler for inbound messages.</param>
+            <param name="cancellationToken">A token to cancel the receive loop.</param>
+        </member>
+        <member name="M:CloudPub.Components.ISocketTransport.SendAsync(CloudPub.Protocol.Message,System.Threading.CancellationToken)">
+            <summary>
+            Sends a message to the server.
+            </summary>
+            <param name="message">The message to send.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="T:CloudPub.MessageExchanger">
+            <summary>
+            Routes inbound <see cref="T:CloudPub.Protocol.Message"/> instances from the socket: handles heartbeats, errors,
+            endpoint acknowledgements, and multiplexed data channels via <see cref="T:CloudPub.Components.IRelaysManager"/>.
+            </summary>
+            <param name="options">Client options (reserved for future use).</param>
+            <param name="relays">Registry used to open, write, and close local data-channel relays.</param>
+        </member>
+        <member name="M:CloudPub.MessageExchanger.#ctor(CloudPub.Options.CloudPubClientOptions,CloudPub.Components.IRelaysManager)">
+            <summary>
+            Routes inbound <see cref="T:CloudPub.Protocol.Message"/> instances from the socket: handles heartbeats, errors,
+            endpoint acknowledgements, and multiplexed data channels via <see cref="T:CloudPub.Components.IRelaysManager"/>.
+            </summary>
+            <param name="options">Client options (reserved for future use).</param>
+            <param name="relays">Registry used to open, write, and close local data-channel relays.</param>
+        </member>
+        <member name="M:CloudPub.MessageExchanger.WaitForMessagesAsync(System.Threading.CancellationToken)">
+            <summary>
+            Returns a value task that completes when at least one message may be read from the internal queue.
+            </summary>
+            <param name="cancellationToken">A token to cancel the wait.</param>
+            <returns><c>true</c> when data may be available; <c>false</c> if the channel completed.</returns>
+        </member>
+        <member name="M:CloudPub.MessageExchanger.ReadMessagesAsync(System.Threading.CancellationToken)">
+            <summary>
+            Asynchronously enumerates all messages delivered to the pending queue (including protocol messages
+            not handled specially in <see cref="M:CloudPub.MessageExchanger.HandleMessage(CloudPub.Components.ISocketTransport,CloudPub.Protocol.Message,System.Threading.CancellationToken)"/>).
+            </summary>
+            <param name="cancellationToken">A token to cancel enumeration.</param>
+        </member>
+        <member name="M:CloudPub.MessageExchanger.HandleMessage(CloudPub.Components.ISocketTransport,CloudPub.Protocol.Message,System.Threading.CancellationToken)">
+            <summary>
+            Processes a single inbound message: replies to heartbeats, completes the queue on fatal errors,
+            manages endpoint and data-channel messages, and enqueues other messages for consumers.
+            </summary>
+            <param name="socket">Transport used to send replies (e.g. heartbeats, acknowledgements).</param>
+            <param name="messgae">The parsed message from the server.</param>
+            <param name="cancellationToken">A token to cancel outbound sends.</param>
+        </member>
+        <member name="M:CloudPub.MessageExchanger.DisposeAsync">
+            <summary>
+            Releases resources associated with the exchanger.
+            </summary>
+        </member>
+        <member name="T:CloudPub.Options.CloudPubClientOptions">
+            <summary>
+            Configuration for connecting to CloudPub: server URL, session credentials, timeouts, and agent identity fields.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.ServerUri">
+            <summary>
+            Gets or sets the HTTP(S) base URL of the CloudPub control plane; WebSocket URL is derived from this value.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.Timeout">
+            <summary>
+            Gets or sets the maximum time to wait for handshake steps after connecting.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.ResumeEndpointsOnConnect">
+            <summary>
+            Gets or sets a value indicating whether to send <c>EndpointStartAll</c> after the receive loop starts.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.Token">
+            <summary>
+            Gets or sets the session token returned by the server after a successful handshake (may be empty before connect).
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.Email">
+            <summary>
+            Gets or sets the account email used in the agent hello when authenticating.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.Password">
+            <summary>
+            Gets or sets the account password used in the agent hello when authenticating.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.AgentId">
+            <summary>
+            Gets or sets a stable agent identifier; a new GUID is used when left empty.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.Hwid">
+            <summary>
+            Gets or sets an optional hardware identifier string reported to the server.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.ClientVersion">
+            <summary>
+            Gets or sets the client version string sent in <c>AgentInfo</c>; a default is used when empty.
+            </summary>
+        </member>
+        <member name="T:CloudPub.Options.CloudPubPublishOptions">
+            <summary>
+            Describes a local service to expose through CloudPub: protocol, address or URL, optional auth, and traffic rules.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubPublishOptions.Protocol">
+            <summary>
+            Gets or sets the application-level protocol for the published endpoint.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubPublishOptions.Auth">
+            <summary>
+            Gets or sets the authentication mode; when <c>null</c>, a default is chosen (e.g. Basic for WebDAV).
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubPublishOptions.Address">
+            <summary>
+            Gets or sets the local bind address: port number, <c>host:port</c>, host with path, or a full URL depending on protocol.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubPublishOptions.Name">
+            <summary>
+            Gets or sets a human-readable name stored as the endpoint description.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubPublishOptions.Acl">
+            <summary>
+            Gets or sets optional access control entries for the endpoint.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubPublishOptions.Headers">
+            <summary>
+            Gets or sets optional HTTP headers to associate with the published service.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubPublishOptions.Rules">
+            <summary>
+            Gets or sets optional filter rules applied to traffic for this endpoint.
+            </summary>
+        </member>
+        <member name="T:CloudPub.RelaysManager">
+            <summary>
+            Thread-safe registry of <see cref="T:CloudPub.Components.IDataChannelRelay"/> instances keyed by server-assigned channel id,
+            selecting TCP or UDP relays based on the endpoint protocol.
+            </summary>
+        </member>
+        <member name="M:CloudPub.RelaysManager.CreateDataChannel(System.UInt32,CloudPub.Protocol.ServerEndpoint,System.Threading.CancellationToken)">
+            <summary>
+            Opens a local relay for the given channel id according to <paramref name="endpoint"/> (TCP by default, UDP when requested).
+            </summary>
+            <param name="channelId">Server-assigned data channel identifier.</param>
+            <param name="endpoint">Describes the local address and protocol to connect to.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.RelaysManager.WriteDataChannel(System.UInt32,System.Byte[],System.Threading.CancellationToken)">
+            <summary>
+            Writes payload bytes to the relay for <paramref name="channelId"/>, if a relay exists.
+            </summary>
+            <param name="channelId">Target data channel identifier.</param>
+            <param name="data">Bytes to forward to the local socket.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.RelaysManager.DeleteDataChannel(System.UInt32,System.Threading.CancellationToken)">
+            <summary>
+            Disposes and removes the relay for <paramref name="channelId"/>, if present.
+            </summary>
+            <param name="channelId">Data channel identifier to tear down.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="T:CloudPub.SocketTransport">
+            <summary>
+            WebSocket-based transport that performs the agent handshake, sends binary protobuf frames,
+            and runs a receive loop dispatching messages to an <see cref="T:CloudPub.Components.IMessageExchanger"/>.
+            </summary>
+            <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
+        </member>
+        <member name="M:CloudPub.SocketTransport.#ctor(CloudPub.Options.CloudPubClientOptions)">
+            <summary>
+            WebSocket-based transport that performs the agent handshake, sends binary protobuf frames,
+            and runs a receive loop dispatching messages to an <see cref="T:CloudPub.Components.IMessageExchanger"/>.
+            </summary>
+            <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
+        </member>
+        <member name="P:CloudPub.SocketTransport.Options">
+            <summary>
+            Gets the options this transport was constructed with (token may be updated after handshake).
+            </summary>
+        </member>
+        <member name="M:CloudPub.SocketTransport.ConnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Connects to the CloudPub WebSocket endpoint, completes the agent hello/ack handshake (following redirects),
+            and stores the session token on success.
+            </summary>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.SocketTransport.StartReceivingAsync(CloudPub.Components.IMessageExchanger,System.Threading.CancellationToken)">
+            <summary>
+            Starts the background receive loop and optionally sends <c>EndpointStartAll</c> when
+            <see cref="P:CloudPub.Options.CloudPubClientOptions.ResumeEndpointsOnConnect"/> is enabled.
+            </summary>
+            <param name="exchanger">Handler for each decoded inbound message.</param>
+            <param name="cancellationToken">A token to cancel the receive loop.</param>
+        </member>
+        <member name="M:CloudPub.SocketTransport.SendAsync(CloudPub.Protocol.Message,System.Threading.CancellationToken)">
+            <summary>
+            Sends a single binary-encoded protobuf message over the open WebSocket.
+            </summary>
+            <param name="message">The message to serialize and send.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.SocketTransport.DisposeAsync">
+            <summary>
+            Sends a graceful stop message when possible, closes the WebSocket, and releases transport resources.
+            </summary>
+        </member>
+        <member name="T:CloudPub.CloudPubException">
+            <summary>
+            Exception thrown when the CloudPub server returns an error, the handshake fails, or an unexpected protocol condition occurs.
+            </summary>
+            <param name="message">The error message.</param>
+            <param name="inner">The inner exception, if any.</param>
+        </member>
+        <member name="M:CloudPub.CloudPubException.#ctor(System.String,System.Exception)">
+            <summary>
+            Exception thrown when the CloudPub server returns an error, the handshake fails, or an unexpected protocol condition occurs.
+            </summary>
+            <param name="message">The error message.</param>
+            <param name="inner">The inner exception, if any.</param>
+        </member>
+        <member name="T:CloudPub.CloudPubClientExtensions">
+            <summary>
+            High-level operations for <see cref="T:CloudPub.Components.ICloudPubClient"/>: publish, stop, unpublish, list, and clear endpoints.
+            </summary>
+        </member>
+        <member name="M:CloudPub.CloudPubClientExtensions.PublishAsync(CloudPub.Components.ICloudPubClient,CloudPub.Options.CloudPubPublishOptions,System.Threading.CancellationToken)">
+            <summary>
+            Starts exposing a local service through CloudPub using the specified publish options.
+            </summary>
+            <param name="client">The connected client.</param>
+            <param name="options">Local binding, protocol, and metadata for the new endpoint.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <returns>The registered endpoint description returned by the server.</returns>
+        </member>
+        <member name="M:CloudPub.CloudPubClientExtensions.StopAsync(CloudPub.Components.ICloudPubClient,CloudPub.Protocol.Endpoint,System.Threading.CancellationToken)">
+            <summary>
+            Stops traffic for an endpoint without removing its registration.
+            </summary>
+            <param name="client">The connected client.</param>
+            <param name="endpoint">The endpoint to stop.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.CloudPubClientExtensions.UnpublishAsync(CloudPub.Components.ICloudPubClient,CloudPub.Protocol.Endpoint,System.Threading.CancellationToken)">
+            <summary>
+            Removes an endpoint registration and marks the in-memory <paramref name="endpoint"/> status as offline.
+            </summary>
+            <param name="client">The connected client.</param>
+            <param name="endpoint">The endpoint to remove.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.CloudPubClientExtensions.CleanAsync(CloudPub.Components.ICloudPubClient,System.Threading.CancellationToken)">
+            <summary>
+            Clears all endpoint registrations on the server.
+            </summary>
+            <param name="client">The connected client.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.CloudPubClientExtensions.ListAsync(CloudPub.Components.ICloudPubClient,System.Threading.CancellationToken)">
+            <summary>
+            Returns the current list of registered endpoints from the server.
+            </summary>
+            <param name="client">The connected client.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <returns>A sequence of endpoint descriptors.</returns>
+        </member>
+        <member name="T:CloudPub.TypesExtensions">
+            <summary>
+            Helpers for protocol wire names, default ports, URI construction, and host/port formatting.
+            </summary>
+        </member>
+        <member name="M:CloudPub.TypesExtensions.ToWireName(CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Returns the wire-format protocol name used in URLs and API payloads.
+            </summary>
+            <param name="protocol">The protocol enum value.</param>
+            <returns>A lowercase identifier (e.g. <c>http</c>, <c>tcp</c>).</returns>
+        </member>
+        <member name="M:CloudPub.TypesExtensions.DefaultPort(CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Returns a common default port for well-known protocols, or <c>null</c> when none is defined.
+            </summary>
+            <param name="protocol">The protocol enum value.</param>
+        </member>
+        <member name="M:CloudPub.TypesExtensions.ToEndpointUri(CloudPub.Protocol.ServerEndpoint)">
+            <summary>
+            Builds a <see cref="T:System.Uri"/> for the public remote address of a <see cref="T:CloudPub.Protocol.ServerEndpoint"/>.
+            </summary>
+            <param name="ep">Server endpoint metadata from a protocol message.</param>
+        </member>
+        <member name="M:CloudPub.TypesExtensions.ToEndpoint(CloudPub.Protocol.ServerEndpoint)">
+            <summary>
+            Maps a <see cref="T:CloudPub.Protocol.ServerEndpoint"/> to the library's <see cref="T:CloudPub.Protocol.Endpoint"/> view model.
+            </summary>
+            <param name="ep">Server endpoint metadata from a protocol message.</param>
+        </member>
+        <member name="M:CloudPub.TypesExtensions.ToHostAndPort(System.Uri)">
+            <summary>
+            Formats a URI as <c>host:port</c>, normalizing default HTTP/HTTPS ports when the port is omitted.
+            </summary>
+            <param name="url">The base URI (typically the CloudPub server URL).</param>
+        </member>
+        <member name="T:CloudPub.MessageExchangerExtensions">
+            <summary>
+            Helpers to wait for and filter messages from an <see cref="T:CloudPub.Components.IMessageExchanger"/>.
+            </summary>
+        </member>
+        <member name="M:CloudPub.MessageExchangerExtensions.WaitMessageOfType(CloudPub.Components.IMessageExchanger,System.Threading.CancellationToken,CloudPub.Protocol.Message.MessageOneofCase[])">
+            <summary>
+            Waits until a message whose kind is one of <paramref name="types"/> is available, skipping others.
+            </summary>
+            <param name="exchanger">The message source.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <param name="types">Accepted message kinds.</param>
+            <returns>The first matching message.</returns>
+        </member>
+        <member name="M:CloudPub.MessageExchangerExtensions.ReadMessageOfType(CloudPub.Components.IMessageExchanger,System.Threading.CancellationToken,CloudPub.Protocol.Message.MessageOneofCase[])">
+            <summary>
+            Reads from the asynchronous stream and returns the first message whose kind is in <paramref name="types"/>,
+            or <c>null</c> if the stream ends before a match.
+            </summary>
+            <param name="exchanger">The message source.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <param name="types">Accepted message kinds.</param>
+        </member>
+        <member name="T:CloudPub.CloudPubClientOptionsExtensions">
+            <summary>
+            Builds a protobuf <see cref="T:CloudPub.Protocol.ClientEndpoint"/> from high-level <see cref="T:CloudPub.Options.CloudPubPublishOptions"/>.
+            </summary>
+        </member>
+        <member name="M:CloudPub.CloudPubClientOptionsExtensions.CreateCleintEndpoint(CloudPub.Options.CloudPubPublishOptions)">
+            <summary>
+            Converts publish options into a <see cref="T:CloudPub.Protocol.ClientEndpoint"/> suitable for <c>EndpointStart</c> messages,
+            supporting both URL-style and shorthand address formats.
+            </summary>
+            <param name="options">User-specified protocol, address, auth, and optional rules.</param>
+            <returns>The configured local endpoint description.</returns>
+        </member>
+        <member name="T:CloudPub.Protocol.ProtocolReflection">
+            <summary>Holder for reflection information generated from protocol.proto</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.ProtocolReflection.Descriptor">
+            <summary>File descriptor for protocol.proto</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Acl.UserFieldNumber">
+            <summary>Field number for the "user" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Acl.RoleFieldNumber">
+            <summary>Field number for the "role" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Header.NameFieldNumber">
+            <summary>Field number for the "name" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Header.ValueFieldNumber">
+            <summary>Field number for the "value" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Endpoint.GuidFieldNumber">
+            <summary>Field number for the "Guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Endpoint.UrlFieldNumber">
+            <summary>Field number for the "Url" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Endpoint.NameFieldNumber">
+            <summary>Field number for the "Name" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Endpoint.StatusFieldNumber">
+            <summary>Field number for the "Status" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Endpoint.ProtocolFieldNumber">
+            <summary>Field number for the "Protocol" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.LocalProtoFieldNumber">
+            <summary>Field number for the "local_proto" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.LocalAddrFieldNumber">
+            <summary>Field number for the "local_addr" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.LocalPortFieldNumber">
+            <summary>Field number for the "local_port" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.LocalPathFieldNumber">
+            <summary>Field number for the "local_path" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.NodelayFieldNumber">
+            <summary>Field number for the "nodelay" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.ClientEndpoint.HasNodelay">
+            <summary>Gets whether the "nodelay" field is set</summary>
+        </member>
+        <member name="M:CloudPub.Protocol.ClientEndpoint.ClearNodelay">
+            <summary>Clears the value of the "nodelay" field</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.DescriptionFieldNumber">
+            <summary>Field number for the "description" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.ClientEndpoint.HasDescription">
+            <summary>Gets whether the "description" field is set</summary>
+        </member>
+        <member name="M:CloudPub.Protocol.ClientEndpoint.ClearDescription">
+            <summary>Clears the value of the "description" field</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.AuthFieldNumber">
+            <summary>Field number for the "auth" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.AclFieldNumber">
+            <summary>Field number for the "acl" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.UsernameFieldNumber">
+            <summary>Field number for the "username" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.PasswordFieldNumber">
+            <summary>Field number for the "password" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.HeadersFieldNumber">
+            <summary>Field number for the "headers" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.FilterRulesFieldNumber">
+            <summary>Field number for the "filter_rules" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ClientEndpoint.ProxyProtocolFieldNumber">
+            <summary>Field number for the "proxy_protocol" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.StatusFieldNumber">
+            <summary>Field number for the "status" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.ServerEndpoint.HasStatus">
+            <summary>Gets whether the "status" field is set</summary>
+        </member>
+        <member name="M:CloudPub.Protocol.ServerEndpoint.ClearStatus">
+            <summary>Clears the value of the "status" field</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.RemoteProtoFieldNumber">
+            <summary>Field number for the "remote_proto" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.RemoteAddrFieldNumber">
+            <summary>Field number for the "remote_addr" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.RemotePortFieldNumber">
+            <summary>Field number for the "remote_port" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.ClientFieldNumber">
+            <summary>Field number for the "client" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.IdFieldNumber">
+            <summary>Field number for the "id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.BindAddrFieldNumber">
+            <summary>Field number for the "bind_addr" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.ErrorFieldNumber">
+            <summary>Field number for the "error" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ServerEndpoint.DefaultStatusFieldNumber">
+            <summary>Field number for the "default_status" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.ServerEndpoint.HasDefaultStatus">
+            <summary>Gets whether the "default_status" field is set</summary>
+        </member>
+        <member name="M:CloudPub.Protocol.ServerEndpoint.ClearDefaultStatus">
+            <summary>Clears the value of the "default_status" field</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.CreateDataChannelWithId.EndpointFieldNumber">
+            <summary>Field number for the "endpoint" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.CreateDataChannelWithId.ChannelIdFieldNumber">
+            <summary>Field number for the "channel_id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.AgentIdFieldNumber">
+            <summary>Field number for the "agent_id" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.AgentId">
+            <summary>
+            Unique identifier for the agent generated and stored in config. Only used for docker containers, for other system hwid used
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.TokenFieldNumber">
+            <summary>Field number for the "token" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Token">
+            <summary>
+            Authentication token for the agent
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.HostnameFieldNumber">
+            <summary>Field number for the "hostname" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Hostname">
+            <summary>
+            Hostname of the machine where agent is running
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.VersionFieldNumber">
+            <summary>Field number for the "version" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Version">
+            <summary>
+            Version of the agent, used for compatibility checks
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.GuiFieldNumber">
+            <summary>Field number for the "gui" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Gui">
+            <summary>
+            Indicates that agent is running in GUI mode
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.PlatformFieldNumber">
+            <summary>Field number for the "platform" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Platform">
+            <summary>
+            Operating system platform, e.g. "linux", "windows", "darwin"
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.HwidFieldNumber">
+            <summary>Field number for the "hwid" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Hwid">
+            <summary>
+            Unique hardware ID of machine, used for agent identification
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.ServerHostAndPortFieldNumber">
+            <summary>Field number for the "server_host_and_port" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.ServerHostAndPort">
+            <summary>
+            Host and port of the server to connect to
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.EmailFieldNumber">
+            <summary>Field number for the "email" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Email">
+            <summary>
+            Email, used for `login` command
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.PasswordFieldNumber">
+            <summary>Field number for the "password" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Password">
+            <summary>
+            Password, used for `login` command
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.SecondaryFieldNumber">
+            <summary>Field number for the "secondary" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Secondary">
+            <summary>
+            Flag that channel used for API commands, not for data/publications
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.TransientFieldNumber">
+            <summary>Field number for the "transient" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.Transient">
+            <summary>
+            Indicates that all created publications on this channel are transient and deleted after disconnection
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentInfo.IsServiceFieldNumber">
+            <summary>Field number for the "is_service" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.AgentInfo.IsService">
+            <summary>
+            Run as service
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelInfo.AgentIdFieldNumber">
+            <summary>Field number for the "agent_id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelInfo.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelData.ChannelIdFieldNumber">
+            <summary>Field number for the "channel_id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelData.DataFieldNumber">
+            <summary>Field number for the "data" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.SocketAddr.V4FieldNumber">
+            <summary>Field number for the "v4" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.SocketAddr.V6FieldNumber">
+            <summary>Field number for the "v6" field.</summary>
+        </member>
+        <member name="T:CloudPub.Protocol.SocketAddr.AddrOneofCase">
+            <summary>Enum of possible cases for the "addr" oneof.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.SocketAddrV4.IpFieldNumber">
+            <summary>Field number for the "ip" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.SocketAddrV4.Ip">
+            <summary>
+            IPv4 address as 32-bit integer
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.SocketAddrV4.PortFieldNumber">
+            <summary>Field number for the "port" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.SocketAddrV4.Port">
+            <summary>
+            Port number
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.SocketAddrV6.IpFieldNumber">
+            <summary>Field number for the "ip" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.SocketAddrV6.Ip">
+            <summary>
+            IPv6 address as 16 bytes
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.SocketAddrV6.PortFieldNumber">
+            <summary>Field number for the "port" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.SocketAddrV6.Port">
+            <summary>
+            Port number
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.SocketAddrV6.FlowinfoFieldNumber">
+            <summary>Field number for the "flowinfo" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.SocketAddrV6.ScopeIdFieldNumber">
+            <summary>Field number for the "scope_id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelDataUdp.ChannelIdFieldNumber">
+            <summary>Field number for the "channel_id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelDataUdp.DataFieldNumber">
+            <summary>Field number for the "data" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelDataUdp.SocketAddrFieldNumber">
+            <summary>Field number for the "socket_addr" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelEof.ChannelIdFieldNumber">
+            <summary>Field number for the "channel_id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelEof.ErrorFieldNumber">
+            <summary>Field number for the "error" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.UpgradeInfo.VersionFieldNumber">
+            <summary>Field number for the "version" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.UpgradeInfo.UrlFieldNumber">
+            <summary>Field number for the "url" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ErrorInfo.KindFieldNumber">
+            <summary>Field number for the "kind" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ErrorInfo.MessageFieldNumber">
+            <summary>Field number for the "message" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ErrorInfo.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ProgressInfo.MessageFieldNumber">
+            <summary>Field number for the "message" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ProgressInfo.TemplateFieldNumber">
+            <summary>Field number for the "template" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ProgressInfo.CurrentFieldNumber">
+            <summary>Field number for the "current" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ProgressInfo.TotalFieldNumber">
+            <summary>Field number for the "total" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.ProgressInfo.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.AgentAck.TokenFieldNumber">
+            <summary>Field number for the "token" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Break.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointListAck.EndpointsFieldNumber">
+            <summary>Field number for the "endpoints" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Redirect.HostAndPortFieldNumber">
+            <summary>Field number for the "host_and_port" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointStop.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointStart.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointStopAck.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointRemove.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointRemoveAck.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.PerformUpgrade.VersionFieldNumber">
+            <summary>Field number for the "version" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelAck.ChannelIdFieldNumber">
+            <summary>Field number for the "channel_id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.DataChannelAck.ConsumedFieldNumber">
+            <summary>Field number for the "consumed" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.DataChannelAck.Consumed">
+            <summary>
+            Number of bytes consumed
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.FilterRule.OrderFieldNumber">
+            <summary>Field number for the "order" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.FilterRule.ActionValueFieldNumber">
+            <summary>Field number for the "action_value" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.FilterRule.HasActionValue">
+            <summary>Gets whether the "action_value" field is set</summary>
+        </member>
+        <member name="M:CloudPub.Protocol.FilterRule.ClearActionValue">
+            <summary>Clears the value of the "action_value" field</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.FilterRule.ActionTypeFieldNumber">
+            <summary>Field number for the "action_type" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.FilterRule.DataFieldNumber">
+            <summary>Field number for the "data" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointStopAll.SetOfflineFieldNumber">
+            <summary>Field number for the "set_offline" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.EndpointStopAll.SetOffline">
+            <summary>
+            If true, set offline default status
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointStatus.GuidFieldNumber">
+            <summary>Field number for the "guid" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointStatus.StatusFieldNumber">
+            <summary>Field number for the "status" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointStatus.DefaultStatusFieldNumber">
+            <summary>Field number for the "default_status" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.EndpointStatus.ErrorFieldNumber">
+            <summary>Field number for the "error" field.</summary>
+        </member>
+        <member name="T:CloudPub.Protocol.Message">
+            <summary>
+            Message wrapper
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.AgentHelloFieldNumber">
+            <summary>Field number for the "agent_hello" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.AgentAckFieldNumber">
+            <summary>Field number for the "agent_ack" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointStartFieldNumber">
+            <summary>Field number for the "endpoint_start" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointAckFieldNumber">
+            <summary>Field number for the "endpoint_ack" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointStopFieldNumber">
+            <summary>Field number for the "endpoint_stop" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.DataChannelHelloFieldNumber">
+            <summary>Field number for the "data_channel_hello" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.Message.DataChannelHello">
+            <summary>
+            Deprecated
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.CreateDataChannelFieldNumber">
+            <summary>Field number for the "create_data_channel" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.HeartBeatFieldNumber">
+            <summary>Field number for the "heart_beat" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.StartForwardTcpFieldNumber">
+            <summary>Field number for the "start_forward_tcp" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.Message.StartForwardTcp">
+            <summary>
+            Deprecated
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.StartForwardUdpFieldNumber">
+            <summary>Field number for the "start_forward_udp" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.Message.StartForwardUdp">
+            <summary>
+            Deprecated
+            </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.ErrorFieldNumber">
+            <summary>Field number for the "error" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.UpgradeAvailableFieldNumber">
+            <summary>Field number for the "upgrade_available" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.RedirectFieldNumber">
+            <summary>Field number for the "redirect" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointRemoveFieldNumber">
+            <summary>Field number for the "endpoint_remove" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.BreakFieldNumber">
+            <summary>Field number for the "break" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.StopFieldNumber">
+            <summary>Field number for the "stop" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.ConnectStateFieldNumber">
+            <summary>Field number for the "connect_state" field.</summary>
+        </member>
+        <member name="P:CloudPub.Protocol.Message.HasConnectState">
+            <summary>Gets whether the "connect_state" field is set</summary>
+        </member>
+        <member name="M:CloudPub.Protocol.Message.ClearConnectState">
+            <summary> Clears the value of the oneof if it's currently set to "connect_state" </summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.ProgressFieldNumber">
+            <summary>Field number for the "progress" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointListFieldNumber">
+            <summary>Field number for the "endpoint_list" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointListAckFieldNumber">
+            <summary>Field number for the "endpoint_list_ack" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointClearFieldNumber">
+            <summary>Field number for the "endpoint_clear" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointClearAckFieldNumber">
+            <summary>Field number for the "endpoint_clear_ack" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointStartAllFieldNumber">
+            <summary>Field number for the "endpoint_start_all" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointStopAckFieldNumber">
+            <summary>Field number for the "endpoint_stop_ack" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointRemoveAckFieldNumber">
+            <summary>Field number for the "endpoint_remove_ack" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.DataChannelDataFieldNumber">
+            <summary>Field number for the "data_channel_data" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.DataChannelDataUdpFieldNumber">
+            <summary>Field number for the "data_channel_data_udp" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.DataChannelEofFieldNumber">
+            <summary>Field number for the "data_channel_eof" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.CreateDataChannelWithIdFieldNumber">
+            <summary>Field number for the "create_data_channel_with_id" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.PerformUpgradeFieldNumber">
+            <summary>Field number for the "perform_upgrade" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.DataChannelAckFieldNumber">
+            <summary>Field number for the "data_channel_ack" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointStopAllFieldNumber">
+            <summary>Field number for the "endpoint_stop_all" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointGuidStartFieldNumber">
+            <summary>Field number for the "endpoint_guid_start" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointStatusFieldNumber">
+            <summary>Field number for the "endpoint_status" field.</summary>
+        </member>
+        <member name="F:CloudPub.Protocol.Message.EndpointStatusAckFieldNumber">
+            <summary>Field number for the "endpoint_status_ack" field.</summary>
+        </member>
+        <member name="T:CloudPub.Protocol.Message.MessageOneofCase">
+            <summary>Enum of possible cases for the "message" oneof.</summary>
+        </member>
+    </members>
+</doc>

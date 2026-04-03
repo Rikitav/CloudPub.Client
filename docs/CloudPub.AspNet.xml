@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>CloudPub.AspNet</name>
+    </assembly>
+    <members>
+        <member name="T:CloudPub.HostedCloudPubLifecycleService">
+            <summary>
+            Hosted service that connects the CloudPub client during host startup, publishes configured endpoints,
+            adds their public URLs to <see cref="T:Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature"/>,
+            and unpublishes them on shutdown.
+            </summary>
+            <param name="logger">Logger for publish/unpublish events.</param>
+            <param name="client">CloudPub client registered in DI.</param>
+            <param name="server">The ASP.NET Core server whose address list is updated with published URLs.</param>
+            <param name="serviceProvider">Used to resolve registered <see cref="T:CloudPub.Options.CloudPubPublishOptions"/> instances.</param>
+        </member>
+        <member name="M:CloudPub.HostedCloudPubLifecycleService.#ctor(Microsoft.Extensions.Logging.ILogger{CloudPub.HostedCloudPubLifecycleService},CloudPub.Components.ICloudPubClient,Microsoft.AspNetCore.Hosting.Server.IServer,System.IServiceProvider)">
+            <summary>
+            Hosted service that connects the CloudPub client during host startup, publishes configured endpoints,
+            adds their public URLs to <see cref="T:Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature"/>,
+            and unpublishes them on shutdown.
+            </summary>
+            <param name="logger">Logger for publish/unpublish events.</param>
+            <param name="client">CloudPub client registered in DI.</param>
+            <param name="server">The ASP.NET Core server whose address list is updated with published URLs.</param>
+            <param name="serviceProvider">Used to resolve registered <see cref="T:CloudPub.Options.CloudPubPublishOptions"/> instances.</param>
+        </member>
+        <member name="P:CloudPub.HostedCloudPubLifecycleService.Endpoints">
+            <summary>
+            Gets the collection of registered endpoints as an array.
+            </summary>
+            <remarks>
+            The returned array contains all endpoints that have been registered.
+            Modifications to the collection of endpoints after retrieval will not affect the returned array.
+            </remarks>
+        </member>
+        <member name="M:CloudPub.HostedCloudPubLifecycleService.StartingAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.HostedCloudPubLifecycleService.StoppingAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.HostedCloudPubLifecycleService.StartAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.HostedCloudPubLifecycleService.StartedAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.HostedCloudPubLifecycleService.StopAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.HostedCloudPubLifecycleService.StoppedAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:CloudPub.ICloudPubClientBuilder">
+            <summary>
+            Marker interface reserved for future fluent configuration of the CloudPub client in ASP.NET Core applications.
+            </summary>
+        </member>
+        <member name="T:CloudPub.ServiceCollectionExtensions">
+            <summary>
+            Dependency injection registration helpers for CloudPub client and publish endpoints.
+            </summary>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddCloudPub(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Registers <see cref="T:CloudPub.CloudPubClient"/> as <see cref="T:CloudPub.Components.ICloudPubClient"/> using
+            <see cref="T:Microsoft.Extensions.Options.IOptions`1"/> of <see cref="T:CloudPub.Options.CloudPubClientOptions"/>.
+            </summary>
+            <param name="services">The service collection.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddCloudPub(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,CloudPub.Components.ICloudPubClient})">
+            <summary>
+            Registers a custom factory that produces the singleton <see cref="T:CloudPub.Components.ICloudPubClient"/>.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="factory">Factory that creates the client instance.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddCloudPub(Microsoft.Extensions.DependencyInjection.IServiceCollection,CloudPub.Options.CloudPubClientOptions)">
+            <summary>
+            Registers <see cref="T:CloudPub.CloudPubClient"/> as <see cref="T:CloudPub.Components.ICloudPubClient"/> with explicit options.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="options">Client options instance (not bound from configuration).</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddCloudPub(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>
+            Binds <see cref="T:CloudPub.Options.CloudPubClientOptions"/> from configuration and registers <see cref="T:CloudPub.CloudPubClient"/>.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="optionsConfiguration">Configuration section or root for client options.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,CloudPub.Options.CloudPubPublishOptions)">
+            <summary>
+            Registers a publish profile so <see cref="T:CloudPub.HostedCloudPubLifecycleService"/> publishes it at application startup.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="options">Endpoint description to publish.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.UInt16,System.String,CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Registers an HTTP (or other) endpoint on <c>localhost</c> at the given port.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="port">Local TCP port to expose.</param>
+            <param name="name">Optional description for the published endpoint.</param>
+            <param name="protocolType">Application protocol; defaults to HTTP.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.String,CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Registers a publish profile using a string address (port, host:port, path, or URL depending on protocol).
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="address">Local bind specification as accepted by <see cref="M:CloudPub.CloudPubClientOptionsExtensions.CreateCleintEndpoint(CloudPub.Options.CloudPubPublishOptions)"/>.</param>
+            <param name="name">Optional description for the published endpoint.</param>
+            <param name="protocolType">Application protocol; defaults to HTTP.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.ServiceCollectionExtensions.AddPublishEndpoint(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Registers a publish profile with empty address; useful when the address is supplied elsewhere or protocol-specific defaults apply.
+            </summary>
+            <param name="services">The service collection.</param>
+            <param name="name">Optional description for the published endpoint.</param>
+            <param name="protocolType">Application protocol; defaults to HTTP.</param>
+            <returns>The same collection for chaining.</returns>
+        </member>
+    </members>
+</doc>

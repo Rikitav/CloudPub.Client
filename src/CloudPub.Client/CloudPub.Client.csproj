@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<LangVersion>latest</LangVersion>
+    <RootNamespace>CloudPub</RootNamespace>
+	  
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <EnableNETAnalyzers>True</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+	  
+    <Title>CloudPub.Client</Title>
+    <Version>1.0</Version>
+	<Authors>Rikitav Tim4ik</Authors>
+	<Company>Rikitav Tim4ik</Company>
+    <RepositoryUrl>https://github.com/Rikitav/Telegrator</RepositoryUrl>
+    <PackageTags>cloupub;tcp;proxy;publish;ngrok</PackageTags>
+	  
+    <PackageIcon>cloudpub_nuget.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+	  
+	<BaseOutputPath>..\..\bin</BaseOutputPath>
+	<DocumentationFile>..\..\docs\$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Pack="True" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="True" PackagePath="\" />
+    <None Include="..\..\assets\cloudpub_nuget.png" Pack="True" PackagePath="\" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.34.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.78.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.Linq.Async" Version="7.0.0" />
+    <PackageReference Include="System.Threading.Channels" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="protocol.proto" GrpcServices="None" />
+  </ItemGroup>
+</Project>
