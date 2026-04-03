@@ -189,13 +189,13 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
     {
         try
         {
-            await _relays.WriteDataChannel(channelId, data);
+            uint totalConsumed = await _relays.WriteDataChannel(channelId, data);
             Message consumedMsg = new Message
             {
                 DataChannelAck = new DataChannelAck
                 {
                     ChannelId = channelId,
-                    Consumed = (uint)data.Length
+                    Consumed = uint
                 }
             };
 

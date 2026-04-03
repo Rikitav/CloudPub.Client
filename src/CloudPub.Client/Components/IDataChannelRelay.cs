@@ -11,6 +11,11 @@ public interface IDataChannelRelay : IAsyncDisposable
     public uint ChannelId { get; }
 
     /// <summary>
+    /// Gets the total amount consumed, represented as an unsigned integer.
+    /// </summary>
+    public uint TotalConsumed { get; }
+
+    /// <summary>
     /// Writes data to the underlying local connection.
     /// </summary>
     /// <param name="data">Payload received from the tunnel.</param>

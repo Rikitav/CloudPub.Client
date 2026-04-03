@@ -72,16 +72,17 @@ public class RelaysManager : IRelaysManager
     /// <param name="channelId">Target data channel identifier.</param>
     /// <param name="data">Bytes to forward to the local socket.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    public async Task WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default)
+    public async Task<uint> WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default)
     {
         await RelayAddLock.WaitAsync(cancellationToken);
 
         try
         {
             if (!ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? relay))
-                return;
+                return 0;
 
             await relay.WriteAsync(data, cancellationToken);
+            return relay.TotalConsumed;
         }
         finally
         {

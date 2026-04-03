@@ -13,6 +13,7 @@ public class TcpDataChannelRelay : IDataChannelRelay
 
     /// <inheritdoc />
     public uint ChannelId { get; }
+    public uint TotalConsumed { get; private set; }
 
     private TcpDataChannelRelay(uint channelId, NetworkStream stream)
     {
@@ -48,6 +49,7 @@ public class TcpDataChannelRelay : IDataChannelRelay
         {
             await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             await _stream.WriteAsync(data.AsMemory(0, data.Length), cancellationToken).ConfigureAwait(false);
+            TotalConsumed += (uint)data.Length;
         }
         finally
         {

@@ -21,7 +21,7 @@ public interface IRelaysManager
     /// <param name="channelId">Target channel id.</param>
     /// <param name="data">Payload to write locally.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default);
+    Task<uint> WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Tears down and disposes the relay for <paramref name="channelId"/>.
