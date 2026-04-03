@@ -1,0 +1,314 @@
+syntax = "proto3";
+
+package protocol;
+
+enum ProtocolType {
+  HTTP = 0;
+  HTTPS = 1;
+  TCP = 2;
+  UDP = 3;
+  ONE_C = 4;
+  MINECRAFT = 5;
+  WEBDAV = 6;
+  RTSP = 7;
+  RDP = 8;
+  VNC = 9;
+  SSH = 10;
+}
+
+enum AuthType {
+  NONE = 0;
+  BASIC = 1;
+  FORM = 2;
+}
+
+enum ProxyProtocol {
+  PROXY_PROTOCOL_NONE = 0;
+  PROXY_PROTOCOL_V2 = 1;
+}
+
+enum Role {
+  NOBODY = 0;
+  ADMIN = 1;
+  READER = 2;
+  WRITER = 3;
+}
+
+enum ErrorKind {
+  AUTH_FAILED = 0;
+  FATAL = 1;
+  HANDSHAKE_FAILED = 2;
+  PERMISSION_DENIED = 3;
+  PUBLISH_FAILED = 4;
+  EXECUTE_FAILED = 5;
+  SERVER_ERROR = 6;
+  UPGRADE_FAILED = 7;
+}
+
+enum FilterAction {
+  FILTER_ALLOW = 0;
+  FILTER_DENY = 1;
+  FILTER_REDIRECT = 2;
+  FILTER_LOG = 3;
+}
+
+enum ConnectState {
+  CONNECTING = 0;
+  CONNECTED = 1;
+  DISCONNECTED = 2;
+}
+
+message Acl {
+  string user = 1;
+  Role role = 2;
+}
+
+message Header {
+  string name = 1;
+  string value = 2;
+}
+
+message Endpoint {
+  string Guid = 1;
+  string Url = 2;
+  string Name = 3;
+  string Status = 4;
+  ProtocolType Protocol = 5;
+}
+
+message ClientEndpoint {
+  ProtocolType local_proto = 1;
+  string local_addr = 2;
+  uint32 local_port = 3;
+  string local_path = 4;
+  optional bool nodelay = 5;
+  optional string description = 6;
+  AuthType auth = 7;
+  repeated Acl acl = 8;
+  string username = 9;
+  string password = 10;
+  repeated Header headers = 11;
+  repeated FilterRule filter_rules = 12;
+  ProxyProtocol proxy_protocol = 13;
+}
+
+message ServerEndpoint {
+  optional string status = 1;
+  string guid = 2;
+  ProtocolType remote_proto = 3;
+  string remote_addr = 4;
+  uint32 remote_port = 5;
+  ClientEndpoint client = 6;
+  int64 id = 7;
+  string bind_addr = 8;
+  string error = 9;
+  optional string default_status = 10;
+}
+
+message CreateDataChannelWithId {
+  ServerEndpoint endpoint = 1;
+  uint32 channel_id = 2;
+}
+
+message AgentInfo {
+  string agent_id = 1;              // Unique identifier for the agent generated and stored in config. Only used for docker containers, for other system hwid used
+  string token = 2;                 // Authentication token for the agent
+  string hostname = 3;              // Hostname of the machine where agent is running
+  string version = 4;               // Version of the agent, used for compatibility checks
+  bool gui = 5;                     // Indicates that agent is running in GUI mode
+  string platform = 6;              // Operating system platform, e.g. "linux", "windows", "darwin"
+  string hwid = 7;                  // Unique hardware ID of machine, used for agent identification
+  string server_host_and_port = 8;  // Host and port of the server to connect to
+  string email = 9;                 // Email, used for `login` command
+  string password = 10;             // Password, used for `login` command
+  bool secondary = 11;              // Flag that channel used for API commands, not for data/publications
+  bool transient = 12;              // Indicates that all created publications on this channel are transient and deleted after disconnection
+  bool is_service = 13;             // Run as service
+}
+
+message DataChannelInfo {
+  string agent_id = 1;
+  string guid = 2;
+}
+
+message DataChannelData {
+  uint32 channel_id = 1;
+  bytes data = 2;
+}
+
+message SocketAddr {
+  oneof addr {
+    SocketAddrV4 v4 = 1;
+    SocketAddrV6 v6 = 2;
+  }
+}
+
+message SocketAddrV4 {
+  fixed32 ip = 1;    // IPv4 address as 32-bit integer
+  uint32 port = 2;   // Port number
+}
+
+message SocketAddrV6 {
+  bytes ip = 1;      // IPv6 address as 16 bytes
+  uint32 port = 2;   // Port number
+  uint32 flowinfo = 3;
+  uint32 scope_id = 4;
+}
+
+message DataChannelDataUdp {
+  uint32 channel_id = 1;
+  bytes data = 2;
+  SocketAddr socket_addr = 3;
+}
+
+message DataChannelEof {
+  uint32 channel_id = 1;
+  string error = 2;
+}
+
+message UpgradeInfo {
+  string version = 1;
+  string url = 2;
+}
+
+message ErrorInfo {
+  ErrorKind kind = 1;
+  string message = 2;
+  string guid = 3;
+}
+
+message ProgressInfo {
+  string message = 1;
+  string template = 2;
+  uint32 current = 3;
+  uint32 total = 4;
+  string guid = 5;
+}
+
+message AgentAck {
+    string token = 1;
+}
+
+message HeartBeat {
+}
+
+message StartForwardTcp {
+}
+
+message StartForwardUdp {
+}
+
+message Break {
+  string guid = 1;
+}
+
+message Stop {
+}
+
+message EndpointList {
+}
+
+message EndpointClear {
+}
+
+message EndpointClearAck {
+}
+
+message EndpointListAck {
+  repeated ServerEndpoint endpoints = 1;
+}
+
+message Redirect {
+  string host_and_port = 1;
+}
+
+message EndpointStop {
+  string guid = 1;
+}
+
+message EndpointStart {
+  string guid = 1;
+}
+
+message EndpointStopAck {
+  string guid = 1;
+}
+
+message EndpointRemove {
+  string guid = 1;
+}
+
+message EndpointRemoveAck {
+  string guid = 1;
+}
+
+message EndpointStartAll {
+}
+
+message PerformUpgrade {
+  string version = 1;
+}
+
+message DataChannelAck {
+  uint32 channel_id = 1;
+  uint32 consumed = 2; // Number of bytes consumed
+}
+
+message FilterRule {
+  int32 order = 1;
+  optional string action_value = 2;
+  FilterAction action_type = 3;
+  string data = 4;
+}
+
+message EndpointStopAll {
+  bool set_offline = 1; // If true, set offline default status
+}
+
+message EndpointStatus {
+  string guid = 1;
+  string status = 2;
+  string default_status = 3;
+  string error = 4;
+}
+
+// Message wrapper
+message Message {
+  oneof message {
+    AgentInfo agent_hello = 1;
+    AgentAck agent_ack = 2;
+    ClientEndpoint endpoint_start = 3;
+    ServerEndpoint endpoint_ack = 4;
+    EndpointStop endpoint_stop = 5;
+    DataChannelInfo data_channel_hello = 6; // Deprecated
+    ServerEndpoint create_data_channel = 7;
+    HeartBeat heart_beat = 8;
+    StartForwardTcp start_forward_tcp = 9; // Deprecated
+    StartForwardUdp start_forward_udp = 10; // Deprecated
+    ErrorInfo error = 11;
+    UpgradeInfo upgrade_available = 12;
+    Redirect redirect = 13;
+    EndpointRemove endpoint_remove = 14;
+    Break break = 15;
+    Stop stop = 16;
+    ConnectState connect_state = 17;
+    ProgressInfo progress = 18;
+    EndpointList endpoint_list = 19;
+    EndpointListAck endpoint_list_ack = 20;
+    EndpointClear endpoint_clear = 21;
+    EndpointClearAck endpoint_clear_ack = 22;
+    EndpointStartAll endpoint_start_all = 23;
+    EndpointStopAck endpoint_stop_ack = 24;
+    EndpointRemoveAck endpoint_remove_ack = 25;
+    DataChannelData data_channel_data = 26;
+    DataChannelDataUdp data_channel_data_udp = 27;
+    DataChannelEof data_channel_eof = 28;
+    CreateDataChannelWithId create_data_channel_with_id = 29;
+    PerformUpgrade perform_upgrade = 30;
+    DataChannelAck data_channel_ack = 31;
+    EndpointStopAll endpoint_stop_all = 32;
+    EndpointStart endpoint_guid_start = 33;
+    ServerEndpoint endpoint_status = 34;
+    ServerEndpoint endpoint_status_ack = 35;
+  }
+}
