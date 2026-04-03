@@ -20,5 +20,12 @@ public interface IDataChannelRelay : IAsyncDisposable
     /// </summary>
     /// <param name="data">Payload received from the tunnel.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    public Task WriteAsync(byte[] data, CancellationToken cancellationToken = default);
+    Task WriteAsync(byte[] data, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    Task<ReadOnlyMemory<byte>> ReadAsync(CancellationToken cancellationToken = default);
 }

@@ -13,7 +13,7 @@ public interface IRelaysManager
     /// <param name="channelId">Server-assigned channel id.</param>
     /// <param name="endpoint">Local bind/connect parameters from the server.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default);
+    Task<IDataChannelRelay?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Forwards tunneled bytes to the relay for <paramref name="channelId"/>.

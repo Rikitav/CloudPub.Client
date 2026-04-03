@@ -1,4 +1,5 @@
 using CloudPub.Components;
+using CloudPub.Protocol;
 using System.Net.Sockets;
 
 namespace CloudPub.ChannelRelays;
@@ -56,6 +57,26 @@ public class TcpDataChannelRelay : IDataChannelRelay
         finally
         {
             _writeLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ReadOnlyMemory<byte>> ReadAsync(CancellationToken cancellationToken = default)
+    {
+        byte[] buffer = new byte[8192]; // DATA_BUFFER_SIZE
+
+        try
+        {
+            int bytesRead = await _stream.ReadAsync(buffer, cancellationToken);
+            if (bytesRead == 0) // EOF
+                return ReadOnlyMemory<byte>.Empty;
+
+            return buffer.AsMemory(0, bytesRead);
+        }
+        catch (OperationCanceledException)
+        {
+            // cancelled
+            return ReadOnlyMemory<byte>.Empty;
         }
     }
 

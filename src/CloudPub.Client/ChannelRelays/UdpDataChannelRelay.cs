@@ -1,5 +1,7 @@
 using CloudPub.Components;
+using CloudPub.Protocol;
 using System.Net.Sockets;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace CloudPub.ChannelRelays;
 
@@ -55,6 +57,22 @@ public class UdpDataChannelRelay : IDataChannelRelay
         finally
         {
             _writeLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ReadOnlyMemory<byte>> ReadAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            UdpReceiveResult result = await _udpClient.ReceiveAsync();
+            return result.Buffer;
+        }
+        catch (OperationCanceledException)
+        {
+            // cancelled
+            return ReadOnlyMemory<byte>.Empty;
         }
     }
 

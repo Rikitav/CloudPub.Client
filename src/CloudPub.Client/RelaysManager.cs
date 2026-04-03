@@ -23,14 +23,14 @@ public class RelaysManager : IRelaysManager
     /// <param name="channelId">Server-assigned data channel identifier.</param>
     /// <param name="endpoint">Describes the local address and protocol to connect to.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    public async Task CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default)
+    public async Task<IDataChannelRelay?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default)
     {
         await RelayAddLock.WaitAsync(cancellationToken);
 
         try
         {
             if (endpoint?.Client is null)
-                return;
+                return null;
 
             switch (endpoint.Client.LocalProto)
             {
@@ -43,7 +43,7 @@ public class RelaysManager : IRelaysManager
                             .ConfigureAwait(false);
 
                         ChannelIdToRelayMap.TryAdd(channelId, relay);
-                        break;
+                        return relay;
                     }
 
                 default:
@@ -55,7 +55,7 @@ public class RelaysManager : IRelaysManager
                             .ConfigureAwait(false);
 
                         ChannelIdToRelayMap.TryAdd(channelId, relay);
-                        break;
+                        return relay;
                     }
             }
         }

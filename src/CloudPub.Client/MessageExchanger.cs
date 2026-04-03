@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Channels;
+using CloudPub.ChannelRelays;
 
 namespace CloudPub;
 
@@ -122,6 +123,15 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
                         break;
                     }
 
+                case Message.MessageOneofCase.DataChannelDataUdp:
+                    {
+                        uint channelId = messgae.DataChannelDataUdp.ChannelId;
+                        byte[] data = messgae.DataChannelDataUdp.Data.ToArray();
+
+                        _ = WriteDataChannel(socket, channelId, data, cancellationToken);
+                        break;
+                    }
+
                 default:
                     {
                         _pendingMessages?.Writer.TryWrite(messgae);
@@ -147,7 +157,11 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
     {
         try
         {
-            await _relays.CreateDataChannel(channelId, endpoint, cancellationToken);
+            IDataChannelRelay? relay = await _relays.CreateDataChannel(channelId, endpoint, cancellationToken);
+            if (relay is null)
+                return;
+
+            _ = BeginReadAsync(socket, relay, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -213,6 +227,43 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
             };
 
             await socket.SendAsync(exceptionMsg, cancellationToken);
+        }
+    }
+
+    private async Task BeginReadAsync(ISocketTransport socket, IDataChannelRelay relay, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                ReadOnlyMemory<byte> data = await relay.ReadAsync(cancellationToken);
+                if (data.IsEmpty)
+                    break;
+
+                Message message = new Message();
+                if (relay is UdpDataChannelRelay)
+                {
+                    message.DataChannelDataUdp = new DataChannelDataUdp
+                    {
+                        ChannelId = relay.ChannelId,
+                        Data = ByteString.CopyFrom(data.ToArray())
+                    };
+                }
+                else
+                {
+                    message.DataChannelData = new DataChannelData()
+                    {
+                        ChannelId = relay.ChannelId,
+                        Data = ByteString.CopyFrom(data.ToArray())
+                    };
+                }
+
+                await socket.SendAsync(message, cancellationToken);
+            }
+            catch (Exception exc)
+            {
+
+            }
         }
     }
 

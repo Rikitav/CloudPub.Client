@@ -27,6 +27,9 @@
         <member name="M:CloudPub.ChannelRelays.TcpDataChannelRelay.WriteAsync(System.Byte[],System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:CloudPub.ChannelRelays.TcpDataChannelRelay.ReadAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:CloudPub.ChannelRelays.TcpDataChannelRelay.DisposeAsync">
             <inheritdoc />
         </member>
@@ -51,6 +54,9 @@
             <param name="cancellationToken">A token to cancel the operation.</param>
         </member>
         <member name="M:CloudPub.ChannelRelays.UdpDataChannelRelay.WriteAsync(System.Byte[],System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.ChannelRelays.UdpDataChannelRelay.ReadAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:CloudPub.ChannelRelays.UdpDataChannelRelay.DisposeAsync">
@@ -141,6 +147,13 @@
             </summary>
             <param name="data">Payload received from the tunnel.</param>
             <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.Components.IDataChannelRelay.ReadAsync(System.Threading.CancellationToken)">
+            <summary>
+            
+            </summary>
+            <param name="cancellationToken"></param>
+            <returns></returns>
         </member>
         <member name="T:CloudPub.Components.IMessageExchanger">
             <summary>
