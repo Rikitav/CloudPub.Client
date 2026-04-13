@@ -1,215 +1,197 @@
+// The MIT License (MIT)
+// 
+// CloudPub.Client
+// Copyright 2026 © Rikitav Tim4ik
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 using CloudPub.Components;
 using CloudPub.Options;
+using CloudPub.Protocol;
+using CloudPub.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using CloudPub.Protocol;
 
 namespace CloudPub;
 
 /// <summary>
-/// Dependency injection registration helpers for CloudPub client and publish endpoints.
+/// Service collection extensions for registering CloudPub client integrations in ASP.NET applications.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers <see cref="CloudPubClient"/> as <see cref="CloudPub.Components.ICloudPubClient"/> using
-    /// <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/> of <see cref="CloudPub.Options.CloudPubClientOptions"/>.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddCloudPub(this IServiceCollection services)
+    private static ICloudPubClient ClientFactory(IServiceProvider serviceProvider)
     {
-        services.AddSingleton<ICloudPubClient, CloudPubClient>(sp => new CloudPubClient(sp.GetRequiredService<IOptions<CloudPubClientOptions>>().Value));
-        services.AddHostedService<HostedCloudPubLifecycleService>();
-        return services;
+        CloudPubClientOptions options = serviceProvider.GetRequiredService<IOptions<CloudPubClientOptions>>().Value;
+        ICloudPubRules rules = serviceProvider.GetRequiredService<ICloudPubRules>();
+        return new CloudPubClient(options, rules);
     }
 
     /// <summary>
-    /// Registers a custom factory that produces the singleton <see cref="CloudPub.Components.ICloudPubClient"/>.
+    /// Registers CloudPub using <see cref="IOptions{TOptions}"/> bound <see cref="CloudPubClientOptions"/>.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="factory">Factory that creates the client instance.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddCloudPub(this IServiceCollection services, Func<IServiceProvider, ICloudPubClient> factory)
+    /// <param name="services">Service collection to configure.</param>
+    /// <returns>A fluent CloudPub builder.</returns>
+    public static ICloudPubClientBuilder AddCloudPub(this IServiceCollection services)
     {
-        services.AddSingleton(factory);
-        services.AddHostedService<HostedCloudPubLifecycleService>();
-        return services;
+        AddCloudPubCore(services, static sp => ClientFactory(sp));
+        return new CloudPubClientBuilder(services);
     }
 
     /// <summary>
-    /// Registers <see cref="CloudPubClient"/> as <see cref="CloudPub.Components.ICloudPubClient"/> with explicit options.
+    /// Registers CloudPub with a custom client factory.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="options">Client options instance (not bound from configuration).</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddCloudPub(this IServiceCollection services, CloudPubClientOptions options)
+    /// <param name="services">Service collection to configure.</param>
+    /// <param name="factory">Factory used to create the singleton <see cref="ICloudPubClient"/>.</param>
+    /// <returns>A fluent CloudPub builder.</returns>
+    public static ICloudPubClientBuilder AddCloudPub(this IServiceCollection services, Func<IServiceProvider, ICloudPubClient> factory)
     {
-        services.AddSingleton<ICloudPubClient, CloudPubClient>(sp => new CloudPubClient(options));
-        services.AddHostedService<HostedCloudPubLifecycleService>();
-        return services;
+        AddCloudPubCore(services, factory);
+        return new CloudPubClientBuilder(services);
     }
 
     /// <summary>
-    /// Binds <see cref="CloudPub.Options.CloudPubClientOptions"/> from configuration and registers <see cref="CloudPubClient"/>.
+    /// Registers CloudPub with explicit client options.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="optionsConfiguration">Configuration section or root for client options.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddCloudPub(this IServiceCollection services, IConfiguration optionsConfiguration)
+    /// <param name="services">Service collection to configure.</param>
+    /// <param name="options">Options used to initialize <see cref="CloudPubClient"/>.</param>
+    /// <returns>A fluent CloudPub builder.</returns>
+    public static ICloudPubClientBuilder AddCloudPub(this IServiceCollection services, CloudPubClientOptions options)
+    {
+        AddCloudPubCore(services, sp => new CloudPubClient(options, sp.GetRequiredService<ICloudPubRules>()));
+        return new CloudPubClientBuilder(services);
+    }
+
+    /// <summary>
+    /// Registers CloudPub and binds client options from configuration.
+    /// </summary>
+    /// <param name="services">Service collection to configure.</param>
+    /// <param name="optionsConfiguration">Configuration section containing client options.</param>
+    /// <returns>A fluent CloudPub builder.</returns>
+    public static ICloudPubClientBuilder AddCloudPub(this IServiceCollection services, IConfiguration optionsConfiguration)
     {
         services.Configure<CloudPubClientOptions>(optionsConfiguration);
-        services.AddSingleton<ICloudPubClient, CloudPubClient>(sp => new CloudPubClient(sp.GetRequiredService<IOptions<CloudPubClientOptions>>().Value));
-        services.AddHostedService<HostedCloudPubLifecycleService>();
-        return services;
+        AddCloudPubCore(services, static sp => ClientFactory(sp));
+        return new CloudPubClientBuilder(services);
     }
 
-    /// <summary>
-    /// Registers a publish profile so <see cref="HostedCloudPubLifecycleService"/> publishes it at application startup.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="publishOptions">Publish options.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, CloudPubPublishOptions publishOptions)
+    private static void AddCloudPubCore(IServiceCollection services, Func<IServiceProvider, ICloudPubClient> clientFactory)
     {
-        services.TryAddSingleton<IEnumerable<CloudPubPublishOptions>>(instance: [publishOptions]);
-        return services;
-    }
-
-    /// <summary>
-    /// Registers an HTTP (or other) endpoint on <c>localhost</c> at the given port.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="port">Local TCP port to expose.</param>
-    /// <param name="name">Optional description for the published endpoint.</param>
-    /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, ushort port, string? name = null, ProtocolType protocolType = ProtocolType.Http)
-    {
-        return services.AddPublishEndpoint(new CloudPubPublishOptions()
-        {
-            Protocol = protocolType,
-            Address = port.ToString(),
-            Auth = AuthType.None,
-            Name = name ?? string.Empty,
-        });
-    }
-
-    /// <summary>
-    /// Registers a publish profile using a string address (port, host:port, path, or URL depending on protocol).
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="address">Local bind specification as accepted by <see cref="CloudPub.CloudPubClientOptionsExtensions.CreateCleintEndpoint(CloudPub.Options.CloudPubPublishOptions)"/>.</param>
-    /// <param name="name">Optional description for the published endpoint.</param>
-    /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, string address, string? name = null, ProtocolType protocolType = ProtocolType.Http)
-    {
-        return services.AddPublishEndpoint(new CloudPubPublishOptions()
-        {
-            Protocol = protocolType,
-            Address = address ?? throw new ArgumentNullException(nameof(address)),
-            Auth = AuthType.None,
-            Name = name ?? string.Empty,
-        });
-    }
-
-    /// <summary>
-    /// Registers a publish profile with empty address; useful when the address is supplied elsewhere or protocol-specific defaults apply.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="name">Optional description for the published endpoint.</param>
-    /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, string? name = null, ProtocolType protocolType = ProtocolType.Http)
-    {
-        return services.AddPublishEndpoint(new CloudPubPublishOptions()
-        {
-            Protocol = protocolType,
-            Auth = AuthType.None,
-            Name = name ?? string.Empty,
-        });
-    }
-
-    /// <summary>
-    /// Registers a publish profile so <see cref="HostedCloudPubLifecycleService"/> publishes it at application startup.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="builder">Endpoint builder.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddPublishEndpoint(this IServiceCollection services, Action<ICloudPubEndpointsBuilder> builder)
-    {
-        CloudPubEndpointsBuilder endPointsBuilder = new CloudPubEndpointsBuilder();
-        builder.Invoke(endPointsBuilder);
-
-        services.TryAddSingleton<IEnumerable<CloudPubPublishOptions>>(instance: endPointsBuilder.Endpoints.ToArray());
-        return services;
+        services.TryAddSingleton<ICloudPubRules, CloudPubRules>();
+        services.TryAddSingleton(new CloudPubHostingState());
+        services.Replace(ServiceDescriptor.Singleton(clientFactory));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, HostedCloudPubLifetimeService>());
     }
 }
 
 /// <summary>
-/// Provides extension methods for registering publish endpoints with a cloud publishing service builder.
+/// Convenience methods for endpoint registration on <see cref="ICloudPubClientBuilder"/>.
 /// </summary>
-/// <remarks>
-/// These extension methods enable the configuration of publish endpoints using various specifications, such as local TCP ports, string addresses, or protocol-specific defaults.
-/// They support optional naming and protocol type selection, allowing for flexible endpoint registration in cloud-based applications.
-/// </remarks>
-public static class CloudPubEndpointsBuilderExtensions
+public static class CloudPubClientBuilderExtensions
 {
     /// <summary>
-    /// Registers an HTTP (or other) endpoint on <c>localhost</c> at the given port.
+    /// Adds a preconfigured CloudPub endpoint to the builder.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="port">Local TCP port to expose.</param>
-    /// <param name="name">Optional description for the published endpoint.</param>
-    /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static ICloudPubEndpointsBuilder AddPublishEndpoint(this ICloudPubEndpointsBuilder services, ushort port, string? name = null, ProtocolType protocolType = ProtocolType.Http)
-    {
-        return services.AddPublishEndpoint(new CloudPubPublishOptions()
-        {
-            Protocol = protocolType,
-            Address = port.ToString(),
-            Auth = AuthType.None,
-            Name = name ?? string.Empty,
-        });
-    }
+    /// <param name="builder">CloudPub builder.</param>
+    /// <param name="publishOptions">Endpoint options to publish.</param>
+    /// <returns>The same builder instance for chaining.</returns>
+    public static ICloudPubClientBuilder AddEndpoint(this ICloudPubClientBuilder builder, CloudPubPublishOptions publishOptions)
+        => builder.AddPublishEndpoint(publishOptions);
 
     /// <summary>
-    /// Registers a publish profile using a string address (port, host:port, path, or URL depending on protocol).
+    /// Adds an endpoint by local TCP port.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="address">Local bind specification as accepted by <see cref="CloudPub.CloudPubClientOptionsExtensions.CreateCleintEndpoint(CloudPub.Options.CloudPubPublishOptions)"/>.</param>
-    /// <param name="name">Optional description for the published endpoint.</param>
-    /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static ICloudPubEndpointsBuilder AddPublishEndpoint(this ICloudPubEndpointsBuilder services, string address, string? name = null, ProtocolType protocolType = ProtocolType.Http)
-    {
-        return services.AddPublishEndpoint(new CloudPubPublishOptions()
-        {
-            Protocol = protocolType,
-            Address = address ?? throw new ArgumentNullException(nameof(address)),
-            Auth = AuthType.None,
-            Name = name ?? string.Empty,
-        });
-    }
+    /// <param name="builder">CloudPub builder.</param>
+    /// <param name="port">Local TCP port.</param>
+    /// <param name="name">Optional endpoint label.</param>
+    /// <param name="protocolType">Protocol type to publish.</param>
+    /// <returns>The same builder instance for chaining.</returns>
+    public static ICloudPubClientBuilder Endpoint(this ICloudPubClientBuilder builder, ushort port, string? name = null, ProtocolType protocolType = ProtocolType.Http)
+        => builder.AddEndpoint(port, name, protocolType);
 
     /// <summary>
-    /// Registers a publish profile with empty address; useful when the address is supplied elsewhere or protocol-specific defaults apply.
+    /// Adds an endpoint by custom local address string.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="name">Optional description for the published endpoint.</param>
-    /// <param name="protocolType">Application protocol; defaults to HTTP.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static ICloudPubEndpointsBuilder AddPublishEndpoint(this ICloudPubEndpointsBuilder services, string? name = null, ProtocolType protocolType = ProtocolType.Http)
+    /// <param name="builder">CloudPub builder.</param>
+    /// <param name="address">Local address string.</param>
+    /// <param name="name">Optional endpoint label.</param>
+    /// <param name="protocolType">Protocol type to publish.</param>
+    /// <returns>The same builder instance for chaining.</returns>
+    public static ICloudPubClientBuilder Endpoint(this ICloudPubClientBuilder builder, string address, string? name = null, ProtocolType protocolType = ProtocolType.Http)
+        => builder.AddEndpoint(address, name, protocolType);
+
+    /// <summary>
+    /// Adds an endpoint with protocol defaults for local address.
+    /// </summary>
+    /// <param name="builder">CloudPub builder.</param>
+    /// <param name="name">Optional endpoint label.</param>
+    /// <param name="protocolType">Protocol type to publish.</param>
+    /// <returns>The same builder instance for chaining.</returns>
+    public static ICloudPubClientBuilder Endpoint(this ICloudPubClientBuilder builder, string? name = null, ProtocolType protocolType = ProtocolType.Http)
+        => builder.AddEndpoint(name, protocolType);
+}
+
+/// <summary>
+/// Runtime snapshot of CloudPub configuration and published endpoint state.
+/// </summary>
+public sealed class CloudPubContext
+{
+    private readonly CloudPubHostingState HostingState;
+
+    internal CloudPubContext(CloudPubHostingState hostingState)
+        => HostingState = hostingState;
+
+    /// <summary>
+    /// Gets the endpoints configured before startup.
+    /// </summary>
+    public IEnumerable<CloudPubPublishOptions> PublishOptions => HostingState.PublishOptions.AsReadOnly();
+    /// <summary>
+    /// Gets endpoints successfully published during application lifetime.
+    /// </summary>
+    public IEnumerable<Endpoint> PublishedEndpoints => HostingState.PublishedEndpoints.AsReadOnly();
+    /// <summary>
+    /// Gets currently configured proxy mode.
+    /// </summary>
+    public CloudPubProxyMode ProxyMode => HostingState.ProxyMode;
+}
+
+/// <summary>
+/// Host extensions for executing CloudPub callbacks when the app is started.
+/// </summary>
+public static class WebApplicationHostExtensions
+{
+    /// <summary>
+    /// Registers a callback invoked when the host reaches the started state.
+    /// </summary>
+    /// <typeparam name="T">Host type.</typeparam>
+    /// <param name="app">Host instance.</param>
+    /// <param name="useAction">Callback that receives a <see cref="CloudPubContext"/> snapshot.</param>
+    /// <returns>The same host instance for chaining.</returns>
+    public static T UseCloudPub<T>(this T app, Action<CloudPubContext> useAction) where T : IHost
     {
-        return services.AddPublishEndpoint(new CloudPubPublishOptions()
-        {
-            Protocol = protocolType,
-            Auth = AuthType.None,
-            Name = name ?? string.Empty,
-        });
+        CloudPubHostingState hostingState = app.Services.GetService<CloudPubHostingState>()
+            ?? throw new InvalidOperationException("CloudPubHostingState not found in services.");
+
+        IHostApplicationLifetime lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+        lifetime.ApplicationStarted.Register(() => useAction.Invoke(new CloudPubContext(hostingState)));
+        return app;
     }
 }

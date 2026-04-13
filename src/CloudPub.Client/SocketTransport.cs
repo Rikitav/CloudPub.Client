@@ -1,7 +1,30 @@
+// The MIT License (MIT)
+// 
+// CloudPub.Client
+// Copyright 2026 © Rikitav Tim4ik
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 using CloudPub.Components;
 using CloudPub.Options;
-using Google.Protobuf;
 using CloudPub.Protocol;
+using Google.Protobuf;
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
@@ -13,11 +36,13 @@ namespace CloudPub;
 /// and runs a receive loop dispatching messages to an <see cref="CloudPub.Components.IMessageExchanger"/>.
 /// </summary>
 /// <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
-public class SocketTransport(CloudPubClientOptions options) : ISocketTransport
+/// <param name="rules"></param>
+public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules) : ISocketTransport
 {
     private const string DefaultClientVersion = "3.0.2";
     private const string WebSocketPath = "/endpoint/v3";
 
+    private readonly ICloudPubRules _rules = rules;
     private readonly CloudPubClientOptions _options = options;
     private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
 

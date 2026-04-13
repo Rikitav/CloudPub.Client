@@ -1,58 +1,93 @@
+// The MIT License (MIT)
+// 
+// CloudPub.Client
+// Copyright 2026 © Rikitav Tim4ik
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
+using CloudPub.ChannelRelays;
 using CloudPub.Components;
 using CloudPub.Options;
-using Google.Protobuf;
 using CloudPub.Protocol;
+using Google.Protobuf;
+using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading.Channels;
-using CloudPub.ChannelRelays;
 
 namespace CloudPub;
 
 /// <summary>
-/// Routes inbound <see cref="CloudPub.Protocol.Message"/> instances from the socket: handles heartbeats, errors,
-/// endpoint acknowledgements, and multiplexed data channels via <see cref="CloudPub.Components.IRelaysManager"/>.
+/// Routes inbound <see cref="Message"/> instances from the socket: handles heartbeats, errors,
+/// endpoint acknowledgements, and multiplexed data channels via <see cref="IRelaysManager"/>.
 /// </summary>
 /// <param name="options">Client options (reserved for future use).</param>
+/// <param name="rules"></param>
 /// <param name="relays">Registry used to open, write, and close local data-channel relays.</param>
-public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManager relays) : IMessageExchanger
+public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRules rules, IRelaysManager relays) : IMessageExchanger
 {
-    private readonly Channel<Message> _pendingMessages = Channel.CreateUnbounded<Message>();
+    //public record struct MessagePayload(ISocketTransport socket, Message messgae);
+
     private readonly CloudPubClientOptions _options = options;
+    private readonly ICloudPubRules _rules = rules;
     private readonly IRelaysManager _relays = relays;
 
-    /// <summary>
-    /// Returns a value task that completes when at least one message may be read from the internal queue.
-    /// </summary>
-    /// <param name="cancellationToken">A token to cancel the wait.</param>
-    /// <returns><c>true</c> when data may be available; <c>false</c> if the channel completed.</returns>
-    public ValueTask<bool> WaitForMessagesAsync(CancellationToken cancellationToken = default)
+    private readonly object requestsSync = new object();
+    private readonly ConcurrentDictionary<Message.MessageOneofCase, TaskCompletionSource<Message>> _pendingRequests = [];
+
+    /// <inheritdoc/>
+    public async Task<Message> WaitForMessageAsync(Message.MessageOneofCase messageType, CancellationToken cancellationToken = default)
     {
-        return _pendingMessages.Reader.WaitToReadAsync(cancellationToken);
+        if (messageType == Message.MessageOneofCase.Error)
+            throw new ArgumentException("Cannot await Error message");
+
+        TaskCompletionSource<Message> completionSource;
+        lock (requestsSync)
+        {
+            completionSource = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _pendingRequests.TryAdd(messageType, completionSource);
+        }
+
+        using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(
+            static state =>
+            {
+                var tuple = ((ConcurrentDictionary<Message.MessageOneofCase, TaskCompletionSource<Message>>, Message.MessageOneofCase))state!;
+                if (tuple.Item1.TryRemove(tuple.Item2, out TaskCompletionSource<Message>? tcs))
+                    tcs.TrySetCanceled();
+            },
+            (_pendingRequests, messageType));
+
+        return await completionSource.Task.ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Asynchronously enumerates all messages delivered to the pending queue (including protocol messages
-    /// not handled specially in <see cref="HandleMessage"/>).
-    /// </summary>
-    /// <param name="cancellationToken">A token to cancel enumeration.</param>
-    public IAsyncEnumerable<Message> ReadMessagesAsync(CancellationToken cancellationToken = default)
-    {
-        return _pendingMessages.Reader.ReadAllAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Processes a single inbound message: replies to heartbeats, completes the queue on fatal errors,
-    /// manages endpoint and data-channel messages, and enqueues other messages for consumers.
-    /// </summary>
-    /// <param name="socket">Transport used to send replies (e.g. heartbeats, acknowledgements).</param>
-    /// <param name="messgae">The parsed message from the server.</param>
-    /// <param name="cancellationToken">A token to cancel outbound sends.</param>
+    /// <inheritdoc/>
     public async Task HandleMessage(ISocketTransport socket, Message messgae, CancellationToken cancellationToken)
     {
         try
         {
+            if (messgae.MessageCase != Message.MessageOneofCase.EndpointAck)
+            {
+                lock (requestsSync)
+                {
+                    if (_pendingRequests.TryRemove(messgae.MessageCase, out TaskCompletionSource<Message> completionSource))
+                        completionSource.TrySetResult(messgae);
+                }
+            }
+
             switch (messgae.MessageCase)
             {
                 case Message.MessageOneofCase.HeartBeat:
@@ -66,7 +101,14 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
                         if (!IsFatal(messgae.Error.Kind))
                             break;
 
-                        _pendingMessages.Writer.TryComplete(new CloudPubException($"Fatal Error: {messgae.Error.Message}"));
+                        lock (requestsSync)
+                        {
+                            foreach (TaskCompletionSource<Message> completionSource in _pendingRequests.Values)
+                                completionSource.TrySetResult(messgae);
+
+                            _pendingRequests.Clear();
+                        }
+
                         break;
                     }
 
@@ -82,7 +124,12 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
                             Debug.WriteLine("SERVER ERROR: {0}", messgae.EndpointAck.Error);
                         }
 
-                        _pendingMessages?.Writer.TryWrite(messgae);
+                        lock (requestsSync)
+                        {
+                            if (_pendingRequests.TryRemove(messgae.MessageCase, out TaskCompletionSource<Message> completionSource))
+                                completionSource.TrySetResult(messgae);
+                        }
+
                         break;
                     }
 
@@ -98,6 +145,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
                 case Message.MessageOneofCase.DataChannelEof:
                     {
                         uint channelId = messgae.DataChannelEof.ChannelId;
+                        
                         _ = DeleteDataChannel(socket, channelId, cancellationToken);
                         break;
                     }
@@ -131,17 +179,18 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
                         _ = WriteDataChannel(socket, channelId, data, cancellationToken);
                         break;
                     }
-
-                default:
-                    {
-                        _pendingMessages?.Writer.TryWrite(messgae);
-                        break;
-                    }
             }
         }
         catch (Exception ex)
         {
-            _pendingMessages?.Writer.TryComplete(ex);
+            Debug.WriteLine($"CloudPub MessageExchanger failed while handling message '{messgae.MessageCase}': {ex}");
+            lock (requestsSync)
+            {
+                foreach (TaskCompletionSource<Message> completionSource in _pendingRequests.Values)
+                    completionSource.TrySetResult(messgae);
+
+                _pendingRequests.Clear();
+            }
         }
     }
 
@@ -167,11 +216,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
         {
             Message exceptionMsg = new Message
             {
-                DataChannelEof = new DataChannelEof
-                {
-                    ChannelId = channelId,
-                    Error = ex.Message
-                }
+                DataChannelEof = new DataChannelEof { ChannelId = channelId, Error = ex.Message }
             };
 
             await socket.SendAsync(exceptionMsg, cancellationToken);
@@ -188,11 +233,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
         {
             Message exceptionMsg = new Message
             {
-                DataChannelEof = new DataChannelEof
-                {
-                    ChannelId = channelId,
-                    Error = ex.Message
-                }
+                DataChannelEof = new DataChannelEof { ChannelId = channelId, Error = ex.Message }
             };
 
             await socket.SendAsync(exceptionMsg, cancellationToken);
@@ -203,14 +244,10 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
     {
         try
         {
-            uint totalConsumed = await _relays.WriteDataChannel(channelId, data);
+            uint totalConsumed = await _relays.WriteDataChannel(channelId, data, cancellationToken).ConfigureAwait(false);
             Message consumedMsg = new Message
             {
-                DataChannelAck = new DataChannelAck
-                {
-                    ChannelId = channelId,
-                    Consumed = totalConsumed
-                }
+                DataChannelAck = new DataChannelAck { ChannelId = channelId, Consumed = totalConsumed }
             };
 
             await socket.SendAsync(consumedMsg, cancellationToken).ConfigureAwait(false);
@@ -219,14 +256,10 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
         {
             Message exceptionMsg = new Message
             {
-                DataChannelEof = new DataChannelEof
-                {
-                    ChannelId = channelId,
-                    Error = ex.Message
-                }
+                DataChannelEof = new DataChannelEof { ChannelId = channelId, Error = ex.Message }
             };
 
-            await socket.SendAsync(exceptionMsg, cancellationToken);
+            await socket.SendAsync(exceptionMsg, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -258,11 +291,12 @@ public sealed class MessageExchanger(CloudPubClientOptions options, IRelaysManag
                     };
                 }
 
-                await socket.SendAsync(message, cancellationToken);
+                await socket.SendAsync(message, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exc)
             {
-
+                Debug.WriteLine($"CloudPub relay read loop failed for channelId={relay.ChannelId}: {exc}");
+                break;
             }
         }
     }

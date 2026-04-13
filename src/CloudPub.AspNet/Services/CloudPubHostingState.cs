@@ -1,3 +1,6 @@
+using CloudPub.Options;
+using Endpoint = CloudPub.Protocol.Endpoint;
+
 // The MIT License (MIT)
 // 
 // CloudPub.Client
@@ -21,38 +24,32 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using CloudPub.Options;
-using CloudPub.Protocol;
-
-namespace CloudPub.Components;
+namespace CloudPub.Services;
 
 /// <summary>
-/// Abstraction over the CloudPub agent connection (typically a WebSocket) used to send and receive protobuf messages.
+/// Selected CloudPub traffic proxy mode for ASP.NET integration.
 /// </summary>
-public interface ISocketTransport : IAsyncDisposable
+public enum CloudPubProxyMode
 {
     /// <summary>
-    /// Gets the client options associated with this transport.
+    /// No traffic proxy mode was configured.
     /// </summary>
-    CloudPubClientOptions Options { get; }
+    None = 0,
 
     /// <summary>
-    /// Establishes the connection and completes the handshake.
+    /// Proxy CloudPub traffic to localhost addresses.
     /// </summary>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task ConnectAsync(CancellationToken cancellationToken = default);
+    Localhost = 1,
 
     /// <summary>
-    /// Starts receiving messages and dispatching them to <paramref name="exchanger"/>.
+    /// Proxy CloudPub HTTP traffic directly into the ASP.NET request pipeline.
     /// </summary>
-    /// <param name="exchanger">Handler for inbound messages.</param>
-    /// <param name="cancellationToken">A token to cancel the receive loop.</param>
-    Task StartReceivingAsync(IMessageExchanger exchanger, CancellationToken cancellationToken = default);
+    Pipeline = 2
+}
 
-    /// <summary>
-    /// Sends a message to the server.
-    /// </summary>
-    /// <param name="message">The message to send.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task SendAsync(Message message, CancellationToken cancellationToken = default);
+internal sealed class CloudPubHostingState
+{
+    public List<CloudPubPublishOptions> PublishOptions { get; } = [];
+    public List<Endpoint> PublishedEndpoints { get; } = [];
+    public CloudPubProxyMode ProxyMode { get; set; } = CloudPubProxyMode.None;
 }

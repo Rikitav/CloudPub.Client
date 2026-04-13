@@ -1,3 +1,26 @@
+// The MIT License (MIT)
+// 
+// CloudPub.Client
+// Copyright 2026 © Rikitav Tim4ik
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 using CloudPub.Components;
 using CloudPub.Options;
 using CloudPub.Protocol;
@@ -29,7 +52,7 @@ public static class CloudPubClientExtensions
     {
         Message responce = await client.ExchangeAsync(
             new Message { EndpointStart = options.CreateCleintEndpoint() },
-            [Message.MessageOneofCase.EndpointAck],
+            Message.MessageOneofCase.EndpointAck,
             cancellationToken).ConfigureAwait(false);
 
         return responce.EndpointAck.ToEndpoint();
@@ -45,7 +68,7 @@ public static class CloudPubClientExtensions
     {
         await client.ExchangeAsync(
             new Message { EndpointStop = new EndpointStop { Guid = endpoint.Guid } },
-            [Message.MessageOneofCase.EndpointAck],
+            Message.MessageOneofCase.EndpointAck,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -59,7 +82,7 @@ public static class CloudPubClientExtensions
     {
         await client.ExchangeAsync(
             new Message { EndpointRemove = new EndpointRemove { Guid = endpoint.Guid } },
-            [Message.MessageOneofCase.EndpointRemoveAck],
+            Message.MessageOneofCase.EndpointRemoveAck,
             cancellationToken).ConfigureAwait(false);
 
         endpoint.Status = "offline";
@@ -74,7 +97,7 @@ public static class CloudPubClientExtensions
     {
         await client.ExchangeAsync(
             new Message { EndpointClear = new EndpointClear() },
-            [Message.MessageOneofCase.EndpointClearAck],
+            Message.MessageOneofCase.EndpointClearAck,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -88,7 +111,7 @@ public static class CloudPubClientExtensions
     {
         Message message = await client.ExchangeAsync(
             new Message { EndpointList = new EndpointList() },
-            [Message.MessageOneofCase.EndpointListAck],
+            Message.MessageOneofCase.EndpointListAck,
             cancellationToken).ConfigureAwait(false);
 
         return message.EndpointListAck.Endpoints.Select(x => x.ToEndpoint());
@@ -189,6 +212,7 @@ public static class TypesExtensions
     private static int GetPort(Uri serverUri) => serverUri.IsDefaultPort ? (serverUri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ? 80 : 443) : serverUri.Port;
 }
 
+/*
 /// <summary>
 /// Helpers to wait for and filter messages from an <see cref="CloudPub.Components.IMessageExchanger"/>.
 /// </summary>
@@ -225,6 +249,7 @@ public static class MessageExchangerExtensions
         return await exchanger.ReadMessagesAsync().FirstOrDefaultAsync(msg => types.Contains(msg.MessageCase), cancellationToken);
     }
 }
+*/
 
 /// <summary>
 /// Builds a protobuf <see cref="ClientEndpoint"/> from high-level <see cref="CloudPub.Options.CloudPubPublishOptions"/>.

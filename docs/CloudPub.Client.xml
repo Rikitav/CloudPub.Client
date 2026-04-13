@@ -68,11 +68,12 @@
             exchanges protocol messages, and manages local data-channel relays.
             </summary>
         </member>
-        <member name="M:CloudPub.CloudPubClient.#ctor(CloudPub.Options.CloudPubClientOptions)">
+        <member name="M:CloudPub.CloudPubClient.#ctor(CloudPub.Options.CloudPubClientOptions,CloudPub.Components.ICloudPubRules)">
             <summary>
             Initializes a new instance of the <see cref="T:CloudPub.CloudPubClient"/> class.
             </summary>
             <param name="options">Connection and agent configuration.</param>
+            <param name="rules"></param>
         </member>
         <member name="M:CloudPub.CloudPubClient.ConnectAsync(System.Threading.CancellationToken)">
             <summary>
@@ -80,13 +81,13 @@
             </summary>
             <param name="cancellationToken">A token to cancel the operation.</param>
         </member>
-        <member name="M:CloudPub.CloudPubClient.ExchangeAsync(CloudPub.Protocol.Message,CloudPub.Protocol.Message.MessageOneofCase[],System.Threading.CancellationToken)">
+        <member name="M:CloudPub.CloudPubClient.ExchangeAsync(CloudPub.Protocol.Message,CloudPub.Protocol.Message.MessageOneofCase,System.Threading.CancellationToken)">
             <summary>
             Sends a request message and waits asynchronously for the first response whose
             <see cref="P:CloudPub.Protocol.Message.MessageCase"/> matches one of the specified cases.
             </summary>
             <param name="request">The outbound message to send.</param>
-            <param name="types">One or more expected response message kinds.</param>
+            <param name="type">One or more expected response message kinds.</param>
             <param name="cancellationToken">A token to cancel the operation.</param>
             <returns>The first matching response message.</returns>
         </member>
@@ -105,6 +106,17 @@
             Releases all resources used by the <see cref="T:CloudPub.CloudPubClient"/>.
             </summary>
         </member>
+        <member name="T:CloudPub.CloudPubRules">
+            <summary>
+            Default in-memory implementation of <see cref="T:CloudPub.Components.ICloudPubRules"/>.
+            </summary>
+        </member>
+        <member name="M:CloudPub.CloudPubRules.UseRelayForProtocol(CloudPub.Protocol.ProtocolType,System.Func{CloudPub.Components.IDataChannelRelay})">
+            <inheritdoc />
+        </member>
+        <member name="M:CloudPub.CloudPubRules.WhatRelayUseForProtocol(CloudPub.Protocol.ProtocolType)">
+            <inheritdoc />
+        </member>
         <member name="T:CloudPub.Components.ICloudPubClient">
             <summary>
             Abstraction for a CloudPub agent client that maintains a server connection and performs
@@ -117,14 +129,33 @@
             </summary>
             <param name="cancellationToken">A token to cancel the operation.</param>
         </member>
-        <member name="M:CloudPub.Components.ICloudPubClient.ExchangeAsync(CloudPub.Protocol.Message,CloudPub.Protocol.Message.MessageOneofCase[],System.Threading.CancellationToken)">
+        <member name="M:CloudPub.Components.ICloudPubClient.ExchangeAsync(CloudPub.Protocol.Message,CloudPub.Protocol.Message.MessageOneofCase,System.Threading.CancellationToken)">
             <summary>
             Sends a message and waits for a response matching one of the specified message kinds.
             </summary>
             <param name="request">The message to send.</param>
-            <param name="types">Allowed response message kinds.</param>
+            <param name="type">Allowed response message kinds.</param>
             <param name="cancellationToken">A token to cancel the operation.</param>
-            <returns>The first received message whose kind is in <paramref name="types"/>.</returns>
+            <returns>The first received message whose kind is in <paramref name="type"/>.</returns>
+        </member>
+        <member name="T:CloudPub.Components.ICloudPubRules">
+            <summary>
+            Defines per-protocol relay factory mappings used by the CloudPub client.
+            </summary>
+        </member>
+        <member name="M:CloudPub.Components.ICloudPubRules.UseRelayForProtocol(CloudPub.Protocol.ProtocolType,System.Func{CloudPub.Components.IDataChannelRelay})">
+            <summary>
+            Associates a protocol with a relay factory used to create data-channel relays.
+            </summary>
+            <param name="protocolType">Protocol to bind.</param>
+            <param name="relayFactory">Factory that creates a relay instance for that protocol.</param>
+        </member>
+        <member name="M:CloudPub.Components.ICloudPubRules.WhatRelayUseForProtocol(CloudPub.Protocol.ProtocolType)">
+            <summary>
+            Resolves the relay factory for a protocol, if it was registered.
+            </summary>
+            <param name="protocolType">Protocol to resolve.</param>
+            <returns>The registered relay factory, or <c>null</c> if none was configured.</returns>
         </member>
         <member name="T:CloudPub.Components.IDataChannelRelay">
             <summary>
@@ -160,17 +191,12 @@
             Decodes inbound protocol traffic and dispatches work to socket sends and local relays.
             </summary>
         </member>
-        <member name="M:CloudPub.Components.IMessageExchanger.WaitForMessagesAsync(System.Threading.CancellationToken)">
+        <member name="M:CloudPub.Components.IMessageExchanger.WaitForMessageAsync(CloudPub.Protocol.Message.MessageOneofCase,System.Threading.CancellationToken)">
             <summary>
             Waits until the pending message queue may have items to read.
             </summary>
+            <param name="messageType">A message of awaiting type.</param>
             <param name="cancellationToken">A token to cancel the wait.</param>
-        </member>
-        <member name="M:CloudPub.Components.IMessageExchanger.ReadMessagesAsync(System.Threading.CancellationToken)">
-            <summary>
-            Enumerates messages queued for application-level consumption.
-            </summary>
-            <param name="cancellationToken">A token to cancel enumeration.</param>
         </member>
         <member name="M:CloudPub.Components.IMessageExchanger.HandleMessage(CloudPub.Components.ISocketTransport,CloudPub.Protocol.Message,System.Threading.CancellationToken)">
             <summary>
@@ -244,38 +270,23 @@
             endpoint acknowledgements, and multiplexed data channels via <see cref="T:CloudPub.Components.IRelaysManager"/>.
             </summary>
             <param name="options">Client options (reserved for future use).</param>
+            <param name="rules"></param>
             <param name="relays">Registry used to open, write, and close local data-channel relays.</param>
         </member>
-        <member name="M:CloudPub.MessageExchanger.#ctor(CloudPub.Options.CloudPubClientOptions,CloudPub.Components.IRelaysManager)">
+        <member name="M:CloudPub.MessageExchanger.#ctor(CloudPub.Options.CloudPubClientOptions,CloudPub.Components.ICloudPubRules,CloudPub.Components.IRelaysManager)">
             <summary>
             Routes inbound <see cref="T:CloudPub.Protocol.Message"/> instances from the socket: handles heartbeats, errors,
             endpoint acknowledgements, and multiplexed data channels via <see cref="T:CloudPub.Components.IRelaysManager"/>.
             </summary>
             <param name="options">Client options (reserved for future use).</param>
+            <param name="rules"></param>
             <param name="relays">Registry used to open, write, and close local data-channel relays.</param>
         </member>
-        <member name="M:CloudPub.MessageExchanger.WaitForMessagesAsync(System.Threading.CancellationToken)">
-            <summary>
-            Returns a value task that completes when at least one message may be read from the internal queue.
-            </summary>
-            <param name="cancellationToken">A token to cancel the wait.</param>
-            <returns><c>true</c> when data may be available; <c>false</c> if the channel completed.</returns>
-        </member>
-        <member name="M:CloudPub.MessageExchanger.ReadMessagesAsync(System.Threading.CancellationToken)">
-            <summary>
-            Asynchronously enumerates all messages delivered to the pending queue (including protocol messages
-            not handled specially in <see cref="M:CloudPub.MessageExchanger.HandleMessage(CloudPub.Components.ISocketTransport,CloudPub.Protocol.Message,System.Threading.CancellationToken)"/>).
-            </summary>
-            <param name="cancellationToken">A token to cancel enumeration.</param>
+        <member name="M:CloudPub.MessageExchanger.WaitForMessageAsync(CloudPub.Protocol.Message.MessageOneofCase,System.Threading.CancellationToken)">
+            <inheritdoc/>
         </member>
         <member name="M:CloudPub.MessageExchanger.HandleMessage(CloudPub.Components.ISocketTransport,CloudPub.Protocol.Message,System.Threading.CancellationToken)">
-            <summary>
-            Processes a single inbound message: replies to heartbeats, completes the queue on fatal errors,
-            manages endpoint and data-channel messages, and enqueues other messages for consumers.
-            </summary>
-            <param name="socket">Transport used to send replies (e.g. heartbeats, acknowledgements).</param>
-            <param name="messgae">The parsed message from the server.</param>
-            <param name="cancellationToken">A token to cancel outbound sends.</param>
+            <inheritdoc/>
         </member>
         <member name="M:CloudPub.MessageExchanger.DisposeAsync">
             <summary>
@@ -378,6 +389,12 @@
             selecting TCP or UDP relays based on the endpoint protocol.
             </summary>
         </member>
+        <member name="M:CloudPub.RelaysManager.#ctor(CloudPub.Components.ICloudPubRules)">
+            <summary>
+            Thread-safe registry of <see cref="T:CloudPub.Components.IDataChannelRelay"/> instances keyed by server-assigned channel id,
+            selecting TCP or UDP relays based on the endpoint protocol.
+            </summary>
+        </member>
         <member name="M:CloudPub.RelaysManager.CreateDataChannel(System.UInt32,CloudPub.Protocol.ServerEndpoint,System.Threading.CancellationToken)">
             <summary>
             Opens a local relay for the given channel id according to <paramref name="endpoint"/> (TCP by default, UDP when requested).
@@ -407,13 +424,15 @@
             and runs a receive loop dispatching messages to an <see cref="T:CloudPub.Components.IMessageExchanger"/>.
             </summary>
             <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
+            <param name="rules"></param>
         </member>
-        <member name="M:CloudPub.SocketTransport.#ctor(CloudPub.Options.CloudPubClientOptions)">
+        <member name="M:CloudPub.SocketTransport.#ctor(CloudPub.Options.CloudPubClientOptions,CloudPub.Components.ICloudPubRules)">
             <summary>
             WebSocket-based transport that performs the agent handshake, sends binary protobuf frames,
             and runs a receive loop dispatching messages to an <see cref="T:CloudPub.Components.IMessageExchanger"/>.
             </summary>
             <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
+            <param name="rules"></param>
         </member>
         <member name="P:CloudPub.SocketTransport.Options">
             <summary>
@@ -548,29 +567,6 @@
             Formats a URI as <c>host:port</c>, normalizing default HTTP/HTTPS ports when the port is omitted.
             </summary>
             <param name="url">The base URI (typically the CloudPub server URL).</param>
-        </member>
-        <member name="T:CloudPub.MessageExchangerExtensions">
-            <summary>
-            Helpers to wait for and filter messages from an <see cref="T:CloudPub.Components.IMessageExchanger"/>.
-            </summary>
-        </member>
-        <member name="M:CloudPub.MessageExchangerExtensions.WaitMessageOfType(CloudPub.Components.IMessageExchanger,System.Threading.CancellationToken,CloudPub.Protocol.Message.MessageOneofCase[])">
-            <summary>
-            Waits until a message whose kind is one of <paramref name="types"/> is available, skipping others.
-            </summary>
-            <param name="exchanger">The message source.</param>
-            <param name="cancellationToken">A token to cancel the operation.</param>
-            <param name="types">Accepted message kinds.</param>
-            <returns>The first matching message.</returns>
-        </member>
-        <member name="M:CloudPub.MessageExchangerExtensions.ReadMessageOfType(CloudPub.Components.IMessageExchanger,System.Threading.CancellationToken,CloudPub.Protocol.Message.MessageOneofCase[])">
-            <summary>
-            Reads from the asynchronous stream and returns the first message whose kind is in <paramref name="types"/>,
-            or <c>null</c> if the stream ends before a match.
-            </summary>
-            <param name="exchanger">The message source.</param>
-            <param name="cancellationToken">A token to cancel the operation.</param>
-            <param name="types">Accepted message kinds.</param>
         </member>
         <member name="T:CloudPub.CloudPubClientOptionsExtensions">
             <summary>

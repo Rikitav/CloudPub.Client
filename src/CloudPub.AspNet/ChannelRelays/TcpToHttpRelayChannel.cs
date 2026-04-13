@@ -1,10 +1,10 @@
-// The MIT License (MIT)
+Ôªø// The MIT License (MIT)
 // 
 // CloudPub.Client
-// Copyright 2026 © Rikitav Tim4ik
+// Copyright 2026 ¬© Rikitav Tim4ik
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the ìSoftwareî), to deal
+// of this software and associated documentation files (the ‚ÄúSoftware‚Äù), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
@@ -13,7 +13,7 @@
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
 // 
-// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// THE SOFTWARE IS PROVIDED ‚ÄúAS IS‚Äù, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -22,19 +22,19 @@
 // THE SOFTWARE.
 
 using CloudPub.Components;
-using CloudPub.Protocol;
-using System.Net.Sockets;
-using System.Runtime.InteropServices.ComTypes;
+using Microsoft.AspNetCore.Http;
+using CloudPub.Services;
+using System.Threading.Channels;
+using System.Diagnostics;
 
 namespace CloudPub.ChannelRelays;
 
-/// <summary>
-/// <see cref="CloudPub.Components.IDataChannelRelay"/> implementation that forwards tunneled datagrams to a local UDP socket.
-/// </summary>
-public class UdpDataChannelRelay : IDataChannelRelay
+internal sealed class TcpToHttpRelayChannel(IServiceProvider services, HttpRelayDispatcher dispatcher) : IDataChannelRelay
 {
-    private readonly UdpClient _udpClient;
-    private readonly SemaphoreSlim _writeLock;
+    private readonly HttpRequestAccumulator _accumulator = new HttpRequestAccumulator(services);
+    private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
+    private readonly HttpRelayDispatcher _dispatcher = dispatcher;
+    private readonly Channel<byte[]> _responseChannel = Channel.CreateUnbounded<byte[]>();
 
     /// <inheritdoc />
     public uint ChannelId { get; }
@@ -42,40 +42,20 @@ public class UdpDataChannelRelay : IDataChannelRelay
     /// <inheritdoc />
     public uint TotalConsumed { get; private set; }
 
-    private UdpDataChannelRelay(uint channelId, UdpClient udpClient)
-    {
-        ChannelId = channelId;
-        _udpClient = udpClient;
-        _writeLock = new SemaphoreSlim(1, 1);
-    }
-
-    /// <summary>
-    /// Binds an outbound UDP association to <paramref name="localAddr"/>:<paramref name="localPort"/>.
-    /// </summary>
-    /// <param name="channelId">Server-assigned channel id.</param>
-    /// <param name="localAddr">Hostname or IP of the local UDP service.</param>
-    /// <param name="localPort">UDP port of the local service.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    public static Task<UdpDataChannelRelay> CreateAsync(
-        uint channelId, string localAddr, uint localPort, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        UdpClient udp = new UdpClient();
-
-        udp.Connect(localAddr, (int)localPort);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return Task.FromResult(new UdpDataChannelRelay(channelId, udp));
-    }
-
     /// <inheritdoc />
     public async Task WriteAsync(byte[] data, CancellationToken cancellationToken)
     {
         try
         {
             await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-            await _udpClient.SendAsync(data, data.Length).ConfigureAwait(false);
             TotalConsumed += (uint)data.Length;
+            Debug.WriteLine($"CloudPub TCP->HTTP relay consumed bytes={data.Length}, total={TotalConsumed}");
+            
+            foreach (HttpContext context in _accumulator.Accumulate(data))
+            {
+                Debug.WriteLine($"CloudPub TCP->HTTP relay enqueue request: {context.Request.Method} {context.Request.Path}");
+                await _dispatcher.QueueAsync(new HttpRelayRequest(context, _responseChannel), cancellationToken);
+            }
         }
         finally
         {
@@ -88,9 +68,9 @@ public class UdpDataChannelRelay : IDataChannelRelay
     {
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            UdpReceiveResult result = await _udpClient.ReceiveAsync();
-            return result.Buffer;
+            byte[] response = await _responseChannel.Reader.ReadAsync(cancellationToken);
+            Debug.WriteLine($"CloudPub TCP->HTTP relay sending response bytes={response.Length}");
+            return response;
         }
         catch (OperationCanceledException)
         {
@@ -104,7 +84,7 @@ public class UdpDataChannelRelay : IDataChannelRelay
     {
         try
         {
-            _udpClient.Dispose();
+            _accumulator.Dispose();
             GC.SuppressFinalize(this);
         }
         catch

@@ -21,34 +21,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-namespace CloudPub.Components;
+using Microsoft.AspNetCore.Http;
+using System.Threading.Channels;
 
-/// <summary>
-/// Abstraction for forwarding bytes between CloudPub data channels and a local TCP or UDP socket.
-/// </summary>
-public interface IDataChannelRelay : IAsyncDisposable
+namespace CloudPub.Services;
+
+internal sealed class HttpRelayDispatcher
 {
-    /// <summary>
-    /// Gets the server-assigned channel identifier for this relay.
-    /// </summary>
-    public uint ChannelId { get; }
+    private readonly Channel<HttpRelayRequest> _queue = Channel.CreateUnbounded<HttpRelayRequest>();
 
-    /// <summary>
-    /// Gets the total amount consumed, represented as an unsigned integer.
-    /// </summary>
-    public uint TotalConsumed { get; }
+    public ChannelReader<HttpRelayRequest> Requests => _queue.Reader;
 
-    /// <summary>
-    /// Writes data to the underlying local connection.
-    /// </summary>
-    /// <param name="data">Payload received from the tunnel.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task WriteAsync(byte[] data, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    Task<ReadOnlyMemory<byte>> ReadAsync(CancellationToken cancellationToken = default);
+    public ValueTask QueueAsync(HttpRelayRequest request, CancellationToken cancellationToken)
+        => _queue.Writer.WriteAsync(request, cancellationToken);
 }
+
+internal sealed record HttpRelayRequest(HttpContext Context, Channel<byte[]> ResponseChannel);

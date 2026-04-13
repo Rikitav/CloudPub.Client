@@ -1,6 +1,6 @@
 # CloudPub .NET SDK
 
-Expose local HTTP, HTTPS, TCP, and other services to the internet through [CloudPub](https://cloudpub.ru) — similar in spirit to ngrok-style tunnels, with a **control WebSocket**, **protobuf protocol**, and optional **ASP.NET Core** integration that publishes your app during startup and tears it down on shutdown.
+Expose local HTTP, HTTPS, TCP, UDP, and other services to the internet through [CloudPub](https://cloudpub.ru) — similar in spirit to ngrok-style tunnels, with a **control WebSocket**, **protobuf protocol**, and optional **ASP.NET Core** integration with fluent builder setup.
 
 This repository ships two NuGet packages:
 
@@ -56,7 +56,7 @@ CloudPubClientOptions options = new CloudPubClientOptions
     // Or: Token = "your-token",
 };
 
-await using CloudPubClient client = new CloudPubClient(options);
+await using CloudPubClient client = new CloudPubClient(options, new CloudPubRules());
 await client.ConnectAsync();
 
 Endpoint endpoint = await client.PublishAsync(new CloudPubPublishOptions
@@ -111,11 +111,13 @@ After `ConnectAsync`, use the static extension methods on `ICloudPubClient`:
 
 ## ASP.NET Core addon (`CloudPub.AspNet`)
 
-The addon wires **`ICloudPubClient`** into DI and provides **`HostedCloudPubLifecycleService`**, which:
+The addon wires **`ICloudPubClient`** into DI and uses a fluent `ICloudPubClientBuilder`.
 
-1. Runs during host **startup** (`IHostedLifecycleService.StartingAsync`): connects the client and calls `PublishAsync` for each registered `CloudPubPublishOptions`.
-2. Adds each **public URL** to `IServerAddressesFeature.Addresses` (so logs show “Now listening on …” for the tunnel URL as well as local URLs).
-3. Runs during **shutdown** (`StoppingAsync`): unpublishes each endpoint.
+Startup and shutdown responsibilities are split:
+
+1. **`HostedCloudPubLifetimeService`**: connect/publish on startup, unpublish on shutdown.
+2. **`HostedCloudPubLocalhostProxyService`**: localhost address projection into `IServerAddressesFeature`.
+3. **`HostedCloudPubPipelineProxyService`**: HTTP request forwarding directly into ASP.NET pipeline.
 
 ### 1. Register client + options
 
@@ -160,25 +162,28 @@ builder.Services.AddCloudPub(new CloudPub.Options.CloudPubClientOptions
 builder.Services.AddCloudPub(sp =>
 {
     CloudPub.Options.CloudPubClientOptions o = sp.GetRequiredService<IOptions<CloudPub.Options.CloudPubClientOptions>>().Value;
-    return new CloudPubClient(o);
+    return new CloudPubClient(o, sp.GetRequiredService<ICloudPubRules>());
 });
 ```
 
-### 2. Declare what to publish
+### 2. Declare endpoints and proxy mode
 
-Register one or more publish profiles. The port overload publishes **localhost** at that port (same idea as `Address = "5000"` in the client API):
+Use the fluent builder returned by `AddCloudPub(...)`:
 
 ```csharp
-builder.Services.AddPublishEndpoint(port: 5000, name: "My API");
-
-// Or full control:
-builder.Services.AddPublishEndpoint(new CloudPub.Options.CloudPubPublishOptions
-{
-    Protocol = CloudPub.Protocol.ProtocolType.Https,
-    Address = "5001",
-    Name = "Secure API",
-});
+builder.Services
+    .AddCloudPub(builder.Configuration.GetSection("CloudPub"))
+    .AddEndpoint(5000, "My API")
+    .AddEndpoint(new CloudPub.Options.CloudPubPublishOptions
+    {
+        Protocol = CloudPub.Protocol.ProtocolType.Https,
+        Address = "5001",
+        Name = "Secure API",
+    })
+    .WithLocalhostProxy();
 ```
+
+`WithLocalhostProxy()` and `WithPipelineProxy()` are mutually exclusive.
 
 ### Full minimal `Program.cs` sketch
 
@@ -187,21 +192,14 @@ using CloudPub;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddCloudPub(builder.Configuration.GetSection("CloudPub"));
-builder.Services.AddPublishEndpoint(port: 5000, name: "Sample site");
+builder.Services
+    .AddCloudPub(builder.Configuration.GetSection("CloudPub"))
+    .AddEndpoint(5000, "Sample site")
+    .WithPipelineProxy();
 
 WebApplication app = builder.Build();
 app.MapGet("/", () => "Hello from CloudPub!");
 app.Run();
-```
-
-### CloudPubEndpointsBuilder
-
-```
-builder.Services.AddCloudPub(builder.Configuration.GetSection("CloudPub"));
-builder.Services.AddPublishEndpoint(builder => builder
-    .AddPublishEndpoint(port: 5010, name: "Sample site")
-    .AddPublishEndpoint(port: 5020, name: "Sample site 2"));
 ```
 
 **Requirements:** a server that exposes **`IServerAddressesFeature`** (Kestrel does). The hosted service throws at startup if the feature is missing.
@@ -210,12 +208,25 @@ builder.Services.AddPublishEndpoint(builder => builder
 
 ## Sample console project
 
-The solution includes **`CloudPub.Example`**: a small CLI that reads `CLOUDPUB_*` environment variables and can **`publish-http <port>`** to expose a local HTTP port. Run it with:
+The solution includes **`CloudPub.Example`**: a CLI-style app with argument parsing and commands:
+
+- `list`
+- `publish --address <addr> --protocol <proto> [--name <text>] [--auth <mode>] [--wait]`
+- `publish-http <port> [--wait]` (shortcut)
+- `stop --guid <guid>`
+- `unpublish --guid <guid>`
+- `clean`
+
+It reads auth settings from `CLOUDPUB_*` variables or explicit CLI options (`--token`, `--email`, `--password`, `--server`).
+
+Examples:
 
 ```bash
 set CLOUDPUB_EMAIL=you@example.com
 set CLOUDPUB_PASSWORD=secret
-dotnet run --project src/CloudPub.Example/CloudPub.Example.csproj -- publish-http 8080
+dotnet run --project src/CloudPub.Example/CloudPub.Example.csproj -- list
+dotnet run --project src/CloudPub.Example/CloudPub.Example.csproj -- publish --protocol tcp --address 127.0.0.1:25565 --name "Minecraft"
+dotnet run --project src/CloudPub.Example/CloudPub.Example.csproj -- publish-http 8080 --wait
 ```
 
 (Use `CLOUDPUB_TOKEN` instead of email/password if you prefer.)

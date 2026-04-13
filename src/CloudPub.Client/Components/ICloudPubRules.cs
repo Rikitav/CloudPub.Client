@@ -1,10 +1,10 @@
-// The MIT License (MIT)
+Ôªø// The MIT License (MIT)
 // 
 // CloudPub.Client
-// Copyright 2026 © Rikitav Tim4ik
+// Copyright 2026 ¬© Rikitav Tim4ik
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the ìSoftwareî), to deal
+// of this software and associated documentation files (the ‚ÄúSoftware‚Äù), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
@@ -13,7 +13,7 @@
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
 // 
-// THE SOFTWARE IS PROVIDED ìAS ISî, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// THE SOFTWARE IS PROVIDED ‚ÄúAS IS‚Äù, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -26,22 +26,21 @@ using CloudPub.Protocol;
 namespace CloudPub.Components;
 
 /// <summary>
-/// Decodes inbound protocol traffic and dispatches work to socket sends and local relays.
+/// Defines per-protocol relay factory mappings used by the CloudPub client.
 /// </summary>
-public interface IMessageExchanger : IAsyncDisposable
+public interface ICloudPubRules
 {
     /// <summary>
-    /// Waits until the pending message queue may have items to read.
+    /// Associates a protocol with a relay factory used to create data-channel relays.
     /// </summary>
-    /// <param name="messageType">A message of awaiting type.</param>
-    /// <param name="cancellationToken">A token to cancel the wait.</param>
-    Task<Message> WaitForMessageAsync(Message.MessageOneofCase messageType, CancellationToken cancellationToken = default);
+    /// <param name="protocolType">Protocol to bind.</param>
+    /// <param name="relayFactory">Factory that creates a relay instance for that protocol.</param>
+    void UseRelayForProtocol(ProtocolType protocolType, Func<IDataChannelRelay> relayFactory);
 
     /// <summary>
-    /// Processes one inbound message from the server.
+    /// Resolves the relay factory for a protocol, if it was registered.
     /// </summary>
-    /// <param name="socket">Transport for sending replies.</param>
-    /// <param name="messgae">The received message.</param>
-    /// <param name="cancellationToken">A token to cancel outbound operations.</param>
-    Task HandleMessage(ISocketTransport socket, Message messgae, CancellationToken cancellationToken);
+    /// <param name="protocolType">Protocol to resolve.</param>
+    /// <returns>The registered relay factory, or <c>null</c> if none was configured.</returns>
+    Func<IDataChannelRelay>? WhatRelayUseForProtocol(ProtocolType protocolType);
 }

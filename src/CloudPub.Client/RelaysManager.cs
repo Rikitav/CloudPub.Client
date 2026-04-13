@@ -1,9 +1,31 @@
+// The MIT License (MIT)
+// 
+// CloudPub.Client
+// Copyright 2026 © Rikitav Tim4ik
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 using CloudPub.ChannelRelays;
 using CloudPub.Components;
 using CloudPub.Protocol;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Net.Sockets;
 using ProtocolType = CloudPub.Protocol.ProtocolType;
 
 namespace CloudPub;
@@ -12,9 +34,9 @@ namespace CloudPub;
 /// Thread-safe registry of <see cref="CloudPub.Components.IDataChannelRelay"/> instances keyed by server-assigned channel id,
 /// selecting TCP or UDP relays based on the endpoint protocol.
 /// </summary>
-public class RelaysManager : IRelaysManager
+public class RelaysManager(ICloudPubRules rules) : IRelaysManager
 {
-    private readonly SemaphoreSlim RelayAddLock = new SemaphoreSlim(1, 1);
+    private readonly ICloudPubRules Rules = rules;
     private readonly ConcurrentDictionary<uint, IDataChannelRelay> ChannelIdToRelayMap = [];
 
     /// <summary>
@@ -25,45 +47,46 @@ public class RelaysManager : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<IDataChannelRelay?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default)
     {
-        await RelayAddLock.WaitAsync(cancellationToken);
+        if (endpoint?.Client is null)
+            return null;
 
-        try
+        if (ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? existingRelay))
+            return existingRelay;
+
+        Func<IDataChannelRelay>? relayFactory = Rules.WhatRelayUseForProtocol(endpoint.Client.LocalProto);
+        if (relayFactory != null)
         {
-            if (endpoint?.Client is null)
-                return null;
-
-            switch (endpoint.Client.LocalProto)
-            {
-                case ProtocolType.Udp:
-                    {
-                        string localAddr = endpoint.Client.LocalAddr;
-                        uint localPort = (ushort)endpoint.Client.LocalPort;
-
-                        UdpDataChannelRelay relay = await UdpDataChannelRelay.CreateAsync(channelId, localAddr, localPort, CancellationToken.None)
-                            .ConfigureAwait(false);
-
-                        ChannelIdToRelayMap.TryAdd(channelId, relay);
-                        return relay;
-                    }
-
-                default:
-                    {
-                        string localAddr = endpoint.Client.LocalAddr;
-                        uint localPort = (ushort)endpoint.Client.LocalPort;
-
-                        TcpDataChannelRelay relay = await TcpDataChannelRelay.CreateAsync(channelId, localAddr, localPort, CancellationToken.None)
-                            .ConfigureAwait(false);
-
-                        ChannelIdToRelayMap.TryAdd(channelId, relay);
-                        return relay;
-                    }
-            }
+            IDataChannelRelay relay = new BoundDataChannelRelay(channelId, relayFactory.Invoke());
+            IDataChannelRelay storedRelay = ChannelIdToRelayMap.GetOrAdd(channelId, relay);
+            Debug.WriteLine($"CloudPub relay created (custom), channelId={channelId}, storedNew={ReferenceEquals(storedRelay, relay)}");
+            return storedRelay;
         }
-        finally
+
+        IDataChannelRelay createdRelay;
+        string localAddr = endpoint.Client.LocalAddr;
+        uint localPort = (ushort)endpoint.Client.LocalPort;
+
+        switch (endpoint.Client.LocalProto)
         {
-            Debug.WriteLine("Tunnel created!");
-            RelayAddLock.Release();
+            case ProtocolType.Udp:
+                createdRelay = await UdpDataChannelRelay
+                    .CreateAsync(channelId, localAddr, localPort, cancellationToken)
+                    .ConfigureAwait(false);
+                break;
+
+            default:
+                createdRelay = await TcpDataChannelRelay
+                    .CreateAsync(channelId, localAddr, localPort, cancellationToken)
+                    .ConfigureAwait(false);
+                break;
         }
+
+        IDataChannelRelay relayInMap = ChannelIdToRelayMap.GetOrAdd(channelId, createdRelay);
+        if (!ReferenceEquals(relayInMap, createdRelay))
+            await createdRelay.DisposeAsync().ConfigureAwait(false);
+
+        Debug.WriteLine($"CloudPub relay created, channelId={channelId}, protocol={endpoint.Client.LocalProto}, addr={localAddr}:{localPort}");
+        return relayInMap;
     }
 
     /// <summary>
@@ -74,21 +97,12 @@ public class RelaysManager : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<uint> WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default)
     {
-        await RelayAddLock.WaitAsync(cancellationToken);
+        if (!ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? relay))
+            return 0;
 
-        try
-        {
-            if (!ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? relay))
-                return 0;
-
-            await relay.WriteAsync(data, cancellationToken);
-            return relay.TotalConsumed;
-        }
-        finally
-        {
-            Debug.WriteLine("Data received!");
-            RelayAddLock.Release();
-        }
+        await relay.WriteAsync(data, cancellationToken).ConfigureAwait(false);
+        Debug.WriteLine($"CloudPub relay consumed chunk, channelId={channelId}, bytes={data.Length}, total={relay.TotalConsumed}");
+        return relay.TotalConsumed;
     }
 
     /// <summary>
@@ -98,18 +112,26 @@ public class RelaysManager : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task DeleteDataChannel(uint channelId, CancellationToken cancellationToken = default)
     {
-        await RelayAddLock.WaitAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!ChannelIdToRelayMap.TryRemove(channelId, out IDataChannelRelay? relay))
+            return;
 
-        try
-        {
-            if (!ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? relay))
-                return;
+        await relay.DisposeAsync().ConfigureAwait(false);
+        Debug.WriteLine($"CloudPub relay disposed, channelId={channelId}");
+    }
 
-            await relay.DisposeAsync();
-        }
-        finally
-        {
-            RelayAddLock.Release();
-        }
+    private sealed class BoundDataChannelRelay(uint channelId, IDataChannelRelay innerRelay) : IDataChannelRelay
+    {
+        public uint ChannelId { get; } = channelId;
+        public uint TotalConsumed => innerRelay.TotalConsumed;
+
+        public Task WriteAsync(byte[] data, CancellationToken cancellationToken = default)
+            => innerRelay.WriteAsync(data, cancellationToken);
+
+        public Task<ReadOnlyMemory<byte>> ReadAsync(CancellationToken cancellationToken = default)
+            => innerRelay.ReadAsync(cancellationToken);
+
+        public ValueTask DisposeAsync()
+            => innerRelay.DisposeAsync();
     }
 }
