@@ -28,12 +28,15 @@ namespace CloudPub.Services;
 
 internal sealed class HttpRelayDispatcher
 {
-    private readonly Channel<HttpRelayRequest> _queue = Channel.CreateUnbounded<HttpRelayRequest>();
+    private readonly Channel<HttpContext> _requests = Channel.CreateUnbounded<HttpContext>();
+    private readonly Channel<byte[]> _responces = Channel.CreateUnbounded<byte[]>();
 
-    public ChannelReader<HttpRelayRequest> Requests => _queue.Reader;
+    public ChannelReader<HttpContext> Requests => _requests.Reader;
+    public ChannelReader<byte[]> Responces => _responces.Reader;
 
-    public ValueTask QueueAsync(HttpRelayRequest request, CancellationToken cancellationToken)
-        => _queue.Writer.WriteAsync(request, cancellationToken);
+    public ValueTask RequestAsync(HttpContext request, CancellationToken cancellationToken)
+        => _requests.Writer.WriteAsync(request, cancellationToken);
+
+    public ValueTask ResponceAsync(byte[] responce, CancellationToken cancellationToken)
+        => _responces.Writer.WriteAsync(responce, cancellationToken);
 }
-
-internal sealed record HttpRelayRequest(HttpContext Context, Channel<byte[]> ResponseChannel);

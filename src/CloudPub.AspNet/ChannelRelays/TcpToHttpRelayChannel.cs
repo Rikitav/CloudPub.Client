@@ -54,7 +54,7 @@ internal sealed class TcpToHttpRelayChannel(IServiceProvider services, HttpRelay
             foreach (HttpContext context in _accumulator.Accumulate(data))
             {
                 Debug.WriteLine($"CloudPub TCP->HTTP relay enqueue request: {context.Request.Method} {context.Request.Path}");
-                await _dispatcher.QueueAsync(new HttpRelayRequest(context, _responseChannel), cancellationToken);
+                await _dispatcher.RequestAsync(context, cancellationToken);
             }
         }
         finally
@@ -68,7 +68,7 @@ internal sealed class TcpToHttpRelayChannel(IServiceProvider services, HttpRelay
     {
         try
         {
-            byte[] response = await _responseChannel.Reader.ReadAsync(cancellationToken);
+            byte[] response = await _dispatcher.Responces.ReadAsync(cancellationToken);
             Debug.WriteLine($"CloudPub TCP->HTTP relay sending response bytes={response.Length}");
             return response;
         }

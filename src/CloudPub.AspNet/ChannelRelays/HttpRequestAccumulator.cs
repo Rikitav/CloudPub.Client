@@ -60,7 +60,7 @@ internal sealed class HttpRequestAccumulator(IServiceProvider services) : IDispo
 
             (string path, string query) = ParsePath(pathAndQuery);
 
-            var headers = new HeaderDictionary();
+            HeaderDictionary headers = [];
             int contentLength = 0;
             bool hasChunkedTransferEncoding = false;
 
@@ -77,10 +77,9 @@ internal sealed class HttpRequestAccumulator(IServiceProvider services) : IDispo
                     headers.Append(key, new StringValues(value));
 
                     if (key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
-                        int.TryParse(value, out contentLength);
+                        _ = int.TryParse(value, out contentLength);
 
-                    if (key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) &&
-                        value.Contains("chunked", StringComparison.OrdinalIgnoreCase))
+                    if (key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) && value.Contains("chunked", StringComparison.OrdinalIgnoreCase))
                         hasChunkedTransferEncoding = true;
                 }
             }
@@ -124,7 +123,9 @@ internal sealed class HttpRequestAccumulator(IServiceProvider services) : IDispo
                 && _buffer[i + 1] == HeaderDelimiter[1]
                 && _buffer[i + 2] == HeaderDelimiter[2]
                 && _buffer[i + 3] == HeaderDelimiter[3])
+            {
                 return i;
+            }
         }
 
         return -1;
@@ -155,7 +156,7 @@ internal sealed class HttpRequestAccumulator(IServiceProvider services) : IDispo
     {
         decodedBody = [];
         consumedBytesLength = 0;
-        var body = new List<byte>();
+        List<byte> body = [];
         int cursor = bodyStartIndex;
 
         while (true)
@@ -212,11 +213,13 @@ internal sealed class HttpRequestAccumulator(IServiceProvider services) : IDispo
     {
         for (int i = start; i <= buffer.Count - HeaderDelimiter.Length; i++)
         {
-            if (buffer[i] == HeaderDelimiter[0]
-                && buffer[i + 1] == HeaderDelimiter[1]
-                && buffer[i + 2] == HeaderDelimiter[2]
-                && buffer[i + 3] == HeaderDelimiter[3])
+            if (buffer[i] == HeaderDelimiter[0] &&
+                buffer[i + 1] == HeaderDelimiter[1] &&
+                buffer[i + 2] == HeaderDelimiter[2] &&
+                buffer[i + 3] == HeaderDelimiter[3])
+            {
                 return i;
+            }
         }
 
         return -1;

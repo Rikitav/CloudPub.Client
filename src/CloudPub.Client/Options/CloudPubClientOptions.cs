@@ -21,6 +21,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+using System.Net;
+
 namespace CloudPub.Options;
 
 /// <summary>
@@ -37,6 +39,16 @@ public sealed class CloudPubClientOptions
     /// Gets or sets the maximum time to wait for handshake steps after connecting.
     /// </summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets the proxy using to connect to server.
+    /// </summary>
+    public IWebProxy? Proxy { get; set; }
+
+    /// <summary>
+    /// Gets or sets time interval of web socket heartbeats.
+    /// </summary>
+    public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
     /// Gets or sets a value indicating whether to send <c>EndpointStartAll</c> after the receive loop starts.

@@ -181,7 +181,7 @@
         </member>
         <member name="M:CloudPub.Components.IDataChannelRelay.ReadAsync(System.Threading.CancellationToken)">
             <summary>
-            
+            Reads data from underlaying local connection.
             </summary>
             <param name="cancellationToken"></param>
             <returns></returns>
@@ -306,6 +306,16 @@
         <member name="P:CloudPub.Options.CloudPubClientOptions.Timeout">
             <summary>
             Gets or sets the maximum time to wait for handshake steps after connecting.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.Proxy">
+            <summary>
+            Gets or sets the proxy using to connect to server.
+            </summary>
+        </member>
+        <member name="P:CloudPub.Options.CloudPubClientOptions.KeepAliveInterval">
+            <summary>
+            Gets or sets time interval of web socket heartbeats.
             </summary>
         </member>
         <member name="P:CloudPub.Options.CloudPubClientOptions.ResumeEndpointsOnConnect">

@@ -27,6 +27,7 @@ using CloudPub.Protocol;
 using ProtocolType = CloudPub.Protocol.ProtocolType;
 
 namespace CloudPub;
+#pragma warning disable RCS1194 // Implement exception constructors
 
 /// <summary>
 /// Exception thrown when the CloudPub server returns an error, the handshake fails, or an unexpected protocol condition occurs.

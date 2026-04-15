@@ -62,8 +62,7 @@ internal sealed class HostedCloudPubPipelineProxyService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            HttpRelayRequest request = await _dispatcher.Requests.ReadAsync(stoppingToken);
-            HttpContext context = request.Context;
+            HttpContext context = await _dispatcher.Requests.ReadAsync(stoppingToken);
 
             try
             {
@@ -76,7 +75,7 @@ internal sealed class HostedCloudPubPipelineProxyService(
                 await context.Response.Body.FlushAsync(stoppingToken).ConfigureAwait(false);
 
                 byte[] responseBytes = SerializeHttpResponse(context, responseStream.ToArray());
-                await request.ResponseChannel.Writer.WriteAsync(responseBytes, stoppingToken).ConfigureAwait(false);
+                await _dispatcher.ResponceAsync(responseBytes, stoppingToken).ConfigureAwait(false);
                 logger.LogDebug("CloudPub pipeline request processed: {method} {path} -> {statusCode}, bytes={bytes}",
                     context.Request.Method, context.Request.Path, context.Response.StatusCode, responseBytes.Length);
             }
@@ -84,7 +83,7 @@ internal sealed class HostedCloudPubPipelineProxyService(
             {
                 Debug.WriteLine(exc);
                 logger.LogError(exc, "CloudPub pipeline proxy request failed: {method} {path}", context.Request.Method, context.Request.Path);
-                await request.ResponseChannel.Writer.WriteAsync(BuildInternalServerError(), stoppingToken).ConfigureAwait(false);
+                await _dispatcher.ResponceAsync(BuildInternalServerError(), stoppingToken).ConfigureAwait(false);
             }
         }
 

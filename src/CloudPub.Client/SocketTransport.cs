@@ -43,7 +43,6 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     private const string WebSocketPath = "/endpoint/v3";
 
     private readonly ICloudPubRules _rules = rules;
-    private readonly CloudPubClientOptions _options = options;
     private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
 
     private CancellationTokenSource? _cancellation;
@@ -53,7 +52,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     /// <summary>
     /// Gets the options this transport was constructed with (token may be updated after handshake).
     /// </summary>
-    public CloudPubClientOptions Options => _options;
+    public CloudPubClientOptions Options { get; } = options;
 
     /// <summary>
     /// Connects to the CloudPub WebSocket endpoint, completes the agent hello/ack handshake (following redirects),
@@ -66,7 +65,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
         if (_socket is { State: WebSocketState.Open })
             throw new InvalidOperationException("Already connected.");
 
-        Uri serverUri = _options.ServerUri ?? new Uri("https://cloudpub.ru");
+        Uri serverUri = Options.ServerUri ?? new Uri("https://cloudpub.ru");
         string hostAndPort = serverUri.ToHostAndPort();
 
         while (true)
@@ -76,10 +75,11 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
 
             _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _socket = new ClientWebSocket();
-            _socket.Options.KeepAliveInterval = TimeSpan.FromHours(10);
+            _socket.Options.KeepAliveInterval = Options.KeepAliveInterval;
+            _socket.Options.Proxy = Options.Proxy;
 
             await _socket.ConnectAsync(BuildWebSocketUri(serverUri, hostAndPort), _cancellation.Token).ConfigureAwait(false);
-            await SendAsync(new Message { AgentHello = BuildAgentHello(_options, hostAndPort) }, _cancellation.Token).ConfigureAwait(false);
+            await SendAsync(new Message { AgentHello = BuildAgentHello(Options, hostAndPort) }, _cancellation.Token).ConfigureAwait(false);
 
             using CancellationTokenSource handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token);
             handshakeCts.CancelAfter(Options.Timeout);
@@ -96,7 +96,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
 
             if (ackMsg.AgentAck?.Token is { Length: > 0 } token)
             {
-                _options.Token = token;
+                Options.Token = token;
                 break;
             }
 
@@ -106,7 +106,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
 
     /// <summary>
     /// Starts the background receive loop and optionally sends <c>EndpointStartAll</c> when
-    /// <see cref="CloudPub.Options.CloudPubClientOptions.ResumeEndpointsOnConnect"/> is enabled.
+    /// <see cref="CloudPubClientOptions.ResumeEndpointsOnConnect"/> is enabled.
     /// </summary>
     /// <param name="exchanger">Handler for each decoded inbound message.</param>
     /// <param name="cancellationToken">A token to cancel the receive loop.</param>
@@ -114,7 +114,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     public async Task StartReceivingAsync(IMessageExchanger exchanger, CancellationToken cancellationToken = default)
     {
         _receiveTask = ReceiveLoopAsync(exchanger, cancellationToken);
-        if (_options.ResumeEndpointsOnConnect)
+        if (Options.ResumeEndpointsOnConnect)
             await SendAsync(new Message { EndpointStartAll = new EndpointStartAll() }, cancellationToken).ConfigureAwait(false);
     }
 

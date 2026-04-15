@@ -46,7 +46,7 @@ public interface IDataChannelRelay : IAsyncDisposable
     Task WriteAsync(byte[] data, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 
+    /// Reads data from underlaying local connection.
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
