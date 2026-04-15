@@ -87,9 +87,9 @@ internal sealed class TcpToHttpRelayChannel(IServiceProvider services, HttpRelay
             _accumulator.Dispose();
             GC.SuppressFinalize(this);
         }
-        catch
+        catch (Exception ex)
         {
-            _ = 0xBAD + 0xC0DE;
+            Debug.WriteLine($"CloudPub TCP->HTTP relay dispose failed: {ex}");
         }
 
         await Task.Yield();

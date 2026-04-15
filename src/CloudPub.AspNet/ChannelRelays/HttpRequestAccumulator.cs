@@ -24,111 +24,94 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Primitives;
+using System.Buffers;
+using System.Globalization;
 using System.Text;
 
 namespace CloudPub.ChannelRelays;
 
 internal sealed class HttpRequestAccumulator(IServiceProvider services) : IDisposable
 {
-    private static readonly byte[] HeaderDelimiter = "\r\n\r\n"u8.ToArray();
-    private readonly List<byte> _buffer = [];
+    private const int InitialBufferSize = 16 * 1024;
+    private static readonly byte[] HeaderSeparator = "\r\n\r\n"u8.ToArray();
+
+    private readonly IServiceProvider _services = services;
+    private byte[] _buffer = new byte[InitialBufferSize];
+    private int _bufferLength;
 
     public IReadOnlyList<HttpContext> Accumulate(byte[] chunk)
     {
-        _buffer.AddRange(chunk);
+        Append(chunk);
         var contexts = new List<HttpContext>();
 
-        while (true)
+        int consumed = 0;
+        while (TryParseSingleRequest(_buffer.AsMemory(consumed, _bufferLength - consumed), out HttpContext? context, out int requestBytes))
         {
-            int headerEndIndex = FindHeaderEnd();
-            if (headerEndIndex == -1)
-                break;
-
-            string headerSection = Encoding.ASCII.GetString([.. _buffer], 0, headerEndIndex);
-            string[] headerLines = headerSection.Split(["\r\n"], StringSplitOptions.None);
-
-            if (headerLines.Length == 0)
-                throw new InvalidDataException("Empty request");
-
-            string[] requestLine = headerLines[0].Split(' ');
-            if (requestLine.Length != 3)
-                throw new InvalidDataException("Invalid HTTP request line");
-
-            string method = requestLine[0];
-            string pathAndQuery = requestLine[1];
-            string protocol = requestLine[2];
-
-            (string path, string query) = ParsePath(pathAndQuery);
-
-            HeaderDictionary headers = [];
-            int contentLength = 0;
-            bool hasChunkedTransferEncoding = false;
-
-            for (int i = 1; i < headerLines.Length; i++)
-            {
-                if (string.IsNullOrEmpty(headerLines[i]))
-                    continue;
-
-                int colonIndex = headerLines[i].IndexOf(':');
-                if (colonIndex > 0)
-                {
-                    string key = headerLines[i].Substring(0, colonIndex).Trim();
-                    string value = headerLines[i].Substring(colonIndex + 1).Trim();
-                    headers.Append(key, new StringValues(value));
-
-                    if (key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
-                        _ = int.TryParse(value, out contentLength);
-
-                    if (key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) && value.Contains("chunked", StringComparison.OrdinalIgnoreCase))
-                        hasChunkedTransferEncoding = true;
-                }
-            }
-
-            int requestHeaderLength = headerEndIndex + HeaderDelimiter.Length;
-            byte[] bodyBytes;
-            int totalRequestLength;
-
-            if (hasChunkedTransferEncoding)
-            {
-                if (!TryDecodeChunkedBody([.. _buffer], requestHeaderLength, out bodyBytes, out int chunkBytesLength))
-                    break;
-
-                totalRequestLength = requestHeaderLength + chunkBytesLength;
-                headers.Remove("Transfer-Encoding");
-                headers.ContentLength = bodyBytes.Length;
-            }
-            else
-            {
-                totalRequestLength = requestHeaderLength + contentLength;
-                if (_buffer.Count < totalRequestLength)
-                    break;
-
-                bodyBytes = _buffer.Skip(requestHeaderLength).Take(contentLength).ToArray();
-            }
-
-            HttpContext context = BuildHttpContext(method, path, query, protocol, headers, bodyBytes);
-            
+            consumed += requestBytes;
             contexts.Add(context);
-            _buffer.RemoveRange(0, totalRequestLength);
         }
 
+        Compact(consumed);
         return contexts;
     }
 
-    private int FindHeaderEnd()
+    private bool TryParseSingleRequest(ReadOnlyMemory<byte> payload, out HttpContext context, out int consumedBytes)
     {
-        for (int i = 0; i <= _buffer.Count - HeaderDelimiter.Length; i++)
+        context = null!;
+        consumedBytes = 0;
+        if (payload.IsEmpty)
+            return false;
+
+        ReadOnlySequence<byte> sequence = new ReadOnlySequence<byte>(payload);
+        SequenceReader<byte> reader = new SequenceReader<byte>(sequence);
+        SequencePosition requestStart = reader.Position;
+        if (!TryReadLine(ref reader, out ReadOnlySequence<byte> requestLineBytes))
+            return false;
+
+        ParseRequestLine(requestLineBytes, out string method, out string pathAndQuery, out string protocol);
+        (string path, string query) = ParsePath(pathAndQuery);
+
+        HeaderDictionary headers = [];
+        int contentLength = 0;
+        bool hasChunkedTransferEncoding = false;
+
+        while (true)
         {
-            if (_buffer[i] == HeaderDelimiter[0]
-                && _buffer[i + 1] == HeaderDelimiter[1]
-                && _buffer[i + 2] == HeaderDelimiter[2]
-                && _buffer[i + 3] == HeaderDelimiter[3])
+            if (!TryReadLine(ref reader, out ReadOnlySequence<byte> headerLineBytes))
+                return false;
+
+            if (headerLineBytes.IsEmpty)
+                break;
+
+            ParseHeaderLine(headerLineBytes, headers, ref contentLength, ref hasChunkedTransferEncoding);
+        }
+
+        ReadOnlySequence<byte> bodyBytes = default;
+        if (hasChunkedTransferEncoding)
+        {
+            if (!TryReadChunkedBody(ref reader, out byte[] decodedChunkedBody))
+                return false;
+
+            bodyBytes = new ReadOnlySequence<byte>(decodedChunkedBody);
+            headers.Remove("Transfer-Encoding");
+            headers.ContentLength = decodedChunkedBody.Length;
+        }
+        else
+        {
+            if (reader.Remaining < contentLength)
+                return false;
+
+            if (contentLength > 0)
             {
-                return i;
+                SequencePosition bodyEnd = sequence.GetPosition(contentLength, reader.Position);
+                bodyBytes = sequence.Slice(reader.Position, bodyEnd);
+                reader.Advance(contentLength);
             }
         }
 
-        return -1;
+        consumedBytes = (int)sequence.Slice(requestStart, reader.Position).Length;
+        context = BuildHttpContext(_services, method, path, query, protocol, headers, bodyBytes.ToArray());
+        return true;
     }
 
     private static (string Path, string Query) ParsePath(string pathAndQuery)
@@ -148,84 +131,103 @@ internal sealed class HttpRequestAccumulator(IServiceProvider services) : IDispo
             : (pathAndQuery[..queryIndex], pathAndQuery[queryIndex..]);
     }
 
-    private static bool TryDecodeChunkedBody(
-        IReadOnlyList<byte> buffer,
-        int bodyStartIndex,
-        out byte[] decodedBody,
-        out int consumedBytesLength)
+    private static void ParseRequestLine(ReadOnlySequence<byte> requestLineBytes, out string method, out string pathAndQuery, out string protocol)
     {
-        decodedBody = [];
-        consumedBytesLength = 0;
-        List<byte> body = [];
-        int cursor = bodyStartIndex;
+        string requestLine = Encoding.ASCII.GetString(requestLineBytes.ToArray());
+        string[] parts = requestLine.Split(' ');
+        if (parts.Length != 3)
+            throw new InvalidDataException("Invalid HTTP request line");
+
+        method = parts[0];
+        pathAndQuery = parts[1];
+        protocol = parts[2];
+    }
+
+    private static void ParseHeaderLine(
+        ReadOnlySequence<byte> headerLineBytes,
+        HeaderDictionary headers,
+        ref int contentLength,
+        ref bool hasChunkedTransferEncoding)
+    {
+        string line = Encoding.ASCII.GetString(headerLineBytes.ToArray());
+        int colonIndex = line.IndexOf(':');
+        if (colonIndex <= 0)
+            return;
+
+        string key = line[..colonIndex].Trim();
+        string value = line[(colonIndex + 1)..].Trim();
+        headers.Append(key, new StringValues(value));
+
+        if (key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out contentLength);
+        }
+
+        if (key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) &&
+            value.Contains("chunked", StringComparison.OrdinalIgnoreCase))
+        {
+            hasChunkedTransferEncoding = true;
+        }
+    }
+
+    private static bool TryReadChunkedBody(ref SequenceReader<byte> reader, out byte[] body)
+    {
+        ArrayBufferWriter<byte> writer = new ArrayBufferWriter<byte>();
 
         while (true)
         {
-            int lineEnd = FindCrlf(buffer, cursor);
-            if (lineEnd < 0)
+            if (!TryReadLine(ref reader, out ReadOnlySequence<byte> sizeLineBytes))
+            {
+                body = [];
                 return false;
+            }
 
-            string sizeLine = Encoding.ASCII.GetString(buffer.Skip(cursor).Take(lineEnd - cursor).ToArray());
-            string chunkSizeToken = sizeLine.Split(';', 2)[0];
-            if (!int.TryParse(chunkSizeToken, System.Globalization.NumberStyles.HexNumber, null, out int chunkSize))
+            string sizeLine = Encoding.ASCII.GetString(sizeLineBytes.ToArray());
+            string token = sizeLine.Split(';', 2)[0];
+            if (!int.TryParse(token, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int chunkSize))
                 throw new InvalidDataException("Invalid chunk size");
-
-            cursor = lineEnd + 2;
 
             if (chunkSize == 0)
             {
-                int trailersEnd = FindHeaderEnd(buffer, cursor);
-                if (trailersEnd < 0)
+                if (!reader.TryReadTo(out ReadOnlySequence<byte> _, HeaderSeparator, advancePastDelimiter: true))
+                {
+                    body = [];
                     return false;
+                }
 
-                cursor = trailersEnd + HeaderDelimiter.Length;
-                consumedBytesLength = cursor - bodyStartIndex;
-                decodedBody = [.. body];
+                body = writer.WrittenMemory.ToArray();
                 return true;
             }
 
-            if (cursor + chunkSize + 2 > buffer.Count)
-                return false;
-
-            for (int i = 0; i < chunkSize; i++)
-                body.Add(buffer[cursor + i]);
-
-            cursor += chunkSize;
-            if (buffer[cursor] != '\r' || buffer[cursor + 1] != '\n')
-                throw new InvalidDataException("Malformed chunk terminator");
-
-            cursor += 2;
-        }
-    }
-
-    private static int FindCrlf(IReadOnlyList<byte> buffer, int start)
-    {
-        for (int i = start; i < buffer.Count - 1; i++)
-        {
-            if (buffer[i] == '\r' && buffer[i + 1] == '\n')
-                return i;
-        }
-
-        return -1;
-    }
-
-    private static int FindHeaderEnd(IReadOnlyList<byte> buffer, int start)
-    {
-        for (int i = start; i <= buffer.Count - HeaderDelimiter.Length; i++)
-        {
-            if (buffer[i] == HeaderDelimiter[0] &&
-                buffer[i + 1] == HeaderDelimiter[1] &&
-                buffer[i + 2] == HeaderDelimiter[2] &&
-                buffer[i + 3] == HeaderDelimiter[3])
+            if (reader.Remaining < chunkSize + 2)
             {
-                return i;
+                body = [];
+                return false;
             }
-        }
 
-        return -1;
+            ReadOnlySequence<byte> chunkData = reader.Sequence.Slice(reader.Position, chunkSize);
+            chunkData.CopyTo(writer.GetSpan(chunkSize));
+            writer.Advance(chunkSize);
+            reader.Advance(chunkSize);
+
+            if (!TryReadLine(ref reader, out _))
+                throw new InvalidDataException("Malformed chunk terminator");
+        }
     }
 
-    private HttpContext BuildHttpContext(
+    private static bool TryReadLine(ref SequenceReader<byte> reader, out ReadOnlySequence<byte> line)
+    {
+        if (!reader.TryReadTo(out line, (byte)'\n'))
+            return false;
+
+        if (!line.IsEmpty && line.Slice(line.Length - 1, 1).FirstSpan[0] == '\r')
+            line = line.Slice(0, line.Length - 1);
+
+        return true;
+    }
+
+    private static HttpContext BuildHttpContext(
+        IServiceProvider services,
         string method,
         string path,
         string query,
@@ -254,6 +256,36 @@ internal sealed class HttpRequestAccumulator(IServiceProvider services) : IDispo
 
     public void Dispose()
     {
-        _buffer.Clear();
+        _bufferLength = 0;
+        if (_buffer.Length > InitialBufferSize)
+            _buffer = new byte[InitialBufferSize];
+    }
+
+    private void Append(byte[] chunk)
+    {
+        EnsureCapacity(_bufferLength + chunk.Length);
+        chunk.CopyTo(_buffer.AsSpan(_bufferLength));
+        _bufferLength += chunk.Length;
+    }
+
+    private void Compact(int consumedBytes)
+    {
+        if (consumedBytes <= 0)
+            return;
+
+        int remaining = _bufferLength - consumedBytes;
+        if (remaining > 0)
+            _buffer.AsSpan(consumedBytes, remaining).CopyTo(_buffer);
+
+        _bufferLength = remaining;
+    }
+
+    private void EnsureCapacity(int neededCapacity)
+    {
+        if (_buffer.Length >= neededCapacity)
+            return;
+
+        int newLength = Math.Max(_buffer.Length * 2, neededCapacity);
+        Array.Resize(ref _buffer, newLength);
     }
 }
