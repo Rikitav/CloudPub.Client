@@ -40,8 +40,6 @@ namespace CloudPub;
 /// <param name="relays">Registry used to open, write, and close local data-channel relays.</param>
 public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRules rules, IRelaysManager relays) : IMessageExchanger
 {
-    //public record struct MessagePayload(ISocketTransport socket, Message messgae);
-
     private readonly CloudPubClientOptions _options = options;
     private readonly ICloudPubRules _rules = rules;
     private readonly IRelaysManager _relays = relays;
@@ -62,14 +60,13 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
             _pendingRequests.TryAdd(messageType, completionSource);
         }
 
-        using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(
-            static state =>
-            {
-                var tuple = ((ConcurrentDictionary<Message.MessageOneofCase, TaskCompletionSource<Message>>, Message.MessageOneofCase))state!;
-                if (tuple.Item1.TryRemove(tuple.Item2, out TaskCompletionSource<Message>? tcs))
-                    tcs.TrySetCanceled();
-            },
-            (_pendingRequests, messageType));
+        using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(static state =>
+        {
+            var tuple = ((ConcurrentDictionary<Message.MessageOneofCase, TaskCompletionSource<Message>>, Message.MessageOneofCase))state!;
+            if (tuple.Item1.TryRemove(tuple.Item2, out TaskCompletionSource<Message>? tcs))
+                tcs.TrySetCanceled();
+
+        }, (_pendingRequests, messageType));
 
         return await completionSource.Task.ConfigureAwait(false);
     }

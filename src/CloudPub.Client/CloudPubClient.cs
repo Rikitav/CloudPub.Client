@@ -110,7 +110,7 @@ public class CloudPubClient : ICloudPubClient
         if (isDisposed)
             return;
 
-        Dispose(true).GetAwaiter().GetResult();
+        Dispose(true).AsTask().GetAwaiter().GetResult();
         GC.SuppressFinalize(this);
         isDisposed = true;
     }
