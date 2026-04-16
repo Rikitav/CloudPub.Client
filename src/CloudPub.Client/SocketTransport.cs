@@ -25,9 +25,11 @@ using CloudPub.Components;
 using CloudPub.Options;
 using CloudPub.Protocol;
 using Google.Protobuf;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace CloudPub;
 
@@ -69,14 +71,17 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
         Uri serverUri = Options.ServerUri ?? new Uri("https://cloudpub.ru");
         string hostAndPort = serverUri.ToHostAndPort();
 
-        CancellationTokenSource? connectCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        while (!connectCancellation.IsCancellationRequested)
+        CancellationTokenSource? connectCancellation = null;
+        while (connectCancellation?.IsCancellationRequested is not true)
         {
             await CleanupSessionAsync(connectCancellation).ConfigureAwait(false);
+            connectCancellation?.Dispose();
+            connectCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
             cancellationToken.ThrowIfCancellationRequested();
 
             _socket = new ClientWebSocket();
-            _socket.Options.KeepAliveInterval = Options.KeepAliveInterval;
+            _socket.Options.KeepAliveInterval = TimeSpan.FromHours(10);
             _socket.Options.Proxy = Options.Proxy;
 
             await _socket.ConnectAsync(BuildWebSocketUri(serverUri, hostAndPort), connectCancellation.Token).ConfigureAwait(false);
@@ -152,13 +157,14 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     {
         try
         {
-            await Task.Delay(Options.KeepAliveInterval, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-
             while (_socket is { State: WebSocketState.Open } && !cancellationToken.IsCancellationRequested)
             {
-                Message msg = await ReceiveSingleMessageAsync(cancellationToken).ConfigureAwait(false);
-                await exchanger.HandleMessage(this, msg, cancellationToken);
+                Debug.WriteLine("Heartbeat");
+                await Task.Delay(Options.KeepAliveInterval, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                Message msg = new Message() { HeartBeat = new HeartBeat() };
+                await SendAsync(msg, cancellationToken);
             }
         }
         catch (OperationCanceledException)
