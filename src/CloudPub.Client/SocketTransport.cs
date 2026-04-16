@@ -33,7 +33,7 @@ namespace CloudPub;
 
 /// <summary>
 /// WebSocket-based transport that performs the agent handshake, sends binary protobuf frames,
-/// and runs a receive loop dispatching messages to an <see cref="CloudPub.Components.IMessageExchanger"/>.
+/// and runs a receive loop dispatching messages to an <see cref="IMessageExchanger"/>.
 /// </summary>
 /// <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
 /// <param name="rules"></param>
@@ -47,6 +47,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
 
     private CancellationTokenSource? _cancellation;
     private ClientWebSocket? _socket = null;
+    private Task? _hartbeatTask;
     private Task? _receiveTask;
 
     /// <summary>
@@ -68,20 +69,20 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
         Uri serverUri = Options.ServerUri ?? new Uri("https://cloudpub.ru");
         string hostAndPort = serverUri.ToHostAndPort();
 
-        while (true)
+        CancellationTokenSource? connectCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        while (!connectCancellation.IsCancellationRequested)
         {
-            await CleanupSessionAsync().ConfigureAwait(false);
+            await CleanupSessionAsync(connectCancellation).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
-            _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _socket = new ClientWebSocket();
             _socket.Options.KeepAliveInterval = Options.KeepAliveInterval;
             _socket.Options.Proxy = Options.Proxy;
 
-            await _socket.ConnectAsync(BuildWebSocketUri(serverUri, hostAndPort), _cancellation.Token).ConfigureAwait(false);
-            await SendAsync(new Message { AgentHello = BuildAgentHello(Options, hostAndPort) }, _cancellation.Token).ConfigureAwait(false);
+            await _socket.ConnectAsync(BuildWebSocketUri(serverUri, hostAndPort), connectCancellation.Token).ConfigureAwait(false);
+            await SendAsync(new Message { AgentHello = BuildAgentHello(Options, hostAndPort) }, connectCancellation.Token).ConfigureAwait(false);
 
-            using CancellationTokenSource handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token);
+            using CancellationTokenSource handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(connectCancellation.Token);
             handshakeCts.CancelAfter(Options.Timeout);
 
             Message ackMsg = await ReceiveSingleMessageAsync(cancellationToken).ConfigureAwait(false);
@@ -113,21 +114,27 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     [DebuggerStepThrough]
     public async Task StartReceivingAsync(IMessageExchanger exchanger, CancellationToken cancellationToken = default)
     {
-        _receiveTask = ReceiveLoopAsync(exchanger, cancellationToken);
+        _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _receiveTask = ReceiveLoopAsync(exchanger, _cancellation.Token);
+        _hartbeatTask = HeartbeatLoopAsync(exchanger, _cancellation.Token);
+
         if (Options.ResumeEndpointsOnConnect)
-            await SendAsync(new Message { EndpointStartAll = new EndpointStartAll() }, cancellationToken).ConfigureAwait(false);
+            await SendAsync(new Message { EndpointStartAll = new EndpointStartAll() }, _cancellation.Token).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Sends a single binary-encoded protobuf message over the open WebSocket.
     /// </summary>
     /// <param name="message">The message to serialize and send.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <param name="cancellationToken"></param>
     [DebuggerStepThrough]
     public async Task SendAsync(Message message, CancellationToken cancellationToken = default)
     {
         if (_socket is null || _socket.State != WebSocketState.Open)
             throw new InvalidOperationException("WebSocket is not connected.");
+
+        if (_cancellation != null)
+            cancellationToken = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token, cancellationToken).Token;
 
         try
         {
@@ -137,6 +144,30 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
         finally
         {
             _sendLock.Release();
+        }
+    }
+
+    [DebuggerStepThrough]
+    private async Task HeartbeatLoopAsync(IMessageExchanger exchanger, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(Options.KeepAliveInterval, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            while (_socket is { State: WebSocketState.Open } && !cancellationToken.IsCancellationRequested)
+            {
+                Message msg = await ReceiveSingleMessageAsync(cancellationToken).ConfigureAwait(false);
+                await exchanger.HandleMessage(this, msg, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _ = 0xDEADBEEF;
+        }
+        finally
+        {
+            Debug.WriteLine("Receiving loop exited! {0}", _socket?.State);
         }
     }
 
@@ -188,10 +219,9 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     }
 
     [DebuggerStepThrough]
-    private async Task CleanupSessionAsync()
+    private async Task CleanupSessionAsync(CancellationTokenSource? cancellationTokenSource)
     {
-        _cancellation?.Cancel();
-
+        cancellationTokenSource?.Cancel();
         if (_socket is not null)
         {
             if (_socket.State == WebSocketState.Open)
@@ -209,9 +239,6 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
             _socket.Dispose();
             _socket = null;
         }
-
-        _cancellation?.Dispose();
-        _cancellation = null;
 
         if (_receiveTask is not null)
         {
@@ -234,6 +261,13 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     [DebuggerStepThrough]
     public async ValueTask DisposeAsync()
     {
+        _cancellation?.Cancel();
+        if (_receiveTask != null)
+            await _receiveTask.ConfigureAwait(false);
+        
+        if (_hartbeatTask != null)
+            await _hartbeatTask.ConfigureAwait(false);
+
         if (_socket is { State: WebSocketState.Open })
         {
             try
@@ -247,7 +281,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
             }
         }
 
-        await CleanupSessionAsync().ConfigureAwait(false);
+        await CleanupSessionAsync(null).ConfigureAwait(false);
         _sendLock.Dispose();
     }
 

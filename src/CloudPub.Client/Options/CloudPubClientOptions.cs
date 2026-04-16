@@ -48,7 +48,7 @@ public sealed class CloudPubClientOptions
     /// <summary>
     /// Gets or sets time interval of web socket heartbeats.
     /// </summary>
-    public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromMinutes(1);
+    public TimeSpan KeepAliveInterval { get; set; } = TimeSpan.FromMinutes(60);
 
     /// <summary>
     /// Gets or sets a value indicating whether to send <c>EndpointStartAll</c> after the receive loop starts.

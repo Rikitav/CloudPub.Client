@@ -469,7 +469,7 @@
             Sends a single binary-encoded protobuf message over the open WebSocket.
             </summary>
             <param name="message">The message to serialize and send.</param>
-            <param name="cancellationToken">A token to cancel the operation.</param>
+            <param name="cancellationToken"></param>
         </member>
         <member name="M:CloudPub.SocketTransport.DisposeAsync">
             <summary>
