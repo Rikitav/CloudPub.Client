@@ -38,7 +38,7 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
 {
     private readonly ICloudPubRules Rules = rules;
     private readonly ConcurrentDictionary<uint, IDataChannelRelay> ChannelIdToRelayMap = [];
-    private readonly SemaphoreSlim relaySync = new SemaphoreSlim(1, 1); 
+    private readonly ConcurrentDictionary<uint, SemaphoreSlim> relaySync = [];
 
     /// <summary>
     /// Opens a local relay for the given channel id according to <paramref name="endpoint"/> (TCP by default, UDP when requested).
@@ -48,7 +48,9 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<IDataChannelRelay?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default)
     {
-        await relaySync.WaitAsync(cancellationToken);
+        SemaphoreSlim sync = relaySync.GetOrAdd(channelId, _ => new SemaphoreSlim(1, 1));
+        await sync.WaitAsync(cancellationToken);
+
         try
         {
             if (endpoint?.Client is null)
@@ -100,7 +102,7 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
         }
         finally
         {
-            relaySync.Release();
+            sync.Release();
         }
     }
 
@@ -112,7 +114,9 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<uint> WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default)
     {
-        await relaySync.WaitAsync(cancellationToken);
+        SemaphoreSlim sync = relaySync.GetOrAdd(channelId, _ => new SemaphoreSlim(1, 1));
+        await sync.WaitAsync(cancellationToken);
+
         try
         {
             if (!ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? relay))
@@ -124,7 +128,7 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
         }
         finally
         {
-            relaySync.Release();
+            sync.Release();
         }
     }
 
@@ -135,7 +139,9 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task DeleteDataChannel(uint channelId, CancellationToken cancellationToken = default)
     {
-        await relaySync.WaitAsync(cancellationToken);
+        SemaphoreSlim sync = relaySync.GetOrAdd(channelId, _ => new SemaphoreSlim(1, 1));
+        await sync.WaitAsync(cancellationToken);
+
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -147,7 +153,7 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
         }
         finally
         {
-            relaySync.Release();
+            sync.Release();
         }
     }
 
