@@ -14,10 +14,12 @@
 	  
     <Title>CloudPub.AspNet</Title>
     <Version>1.5.5</Version>
-	<Authors>Rikitav Tim4ik</Authors>
-	<Company>Rikitav Tim4ik</Company>
-    <RepositoryUrl>https://github.com/Rikitav/Telegrator</RepositoryUrl>
-    <PackageTags>cloupub;tcp;proxy;publish;ngrok;asp;hosting</PackageTags>
+	<Authors>CloudPub;Rikitav Tim4ik</Authors>
+	<Company>CloudPub;Rikitav Tim4ik</Company>
+    <RepositoryUrl>https://github.com/Rikitav/CloudPub.Client</RepositoryUrl>
+	<PackageProjectUrl>https://cloudpub.ru/</PackageProjectUrl>
+	<Description>The CloudPub Rust SDK provides a simple interface for interacting with the CloudPub platform. CloudPub provides secure tunneling and service publishing, allowing you to securely expose local services to the internet.</Description>
+    <PackageTags>cloupub;tcp;udp;http;https;proxy;publish;ngrok;relay;net;network;networking;domain;</PackageTags>
 	  
     <PackageIcon>cloudpub_nuget.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
