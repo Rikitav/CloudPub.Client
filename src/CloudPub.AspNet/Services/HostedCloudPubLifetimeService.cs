@@ -35,6 +35,12 @@ internal sealed class HostedCloudPubLifetimeService(
     ICloudPubClient client,
     CloudPubHostingState state) : IHostedLifecycleService
 {
+    private Action<CloudPubContext>? callbackOnStarted;
+    private Action<CloudPubContext>? callbackOnStopped;
+
+    public void OnStarted(Action<CloudPubContext> callback) => callbackOnStarted = callback;
+    public void OnStopped(Action<CloudPubContext> callback) => callbackOnStopped = callback;
+
     public async Task StartingAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation("CloudPub lifetime service starting with {count} endpoint(s)", state.PublishOptions.Count);
@@ -86,8 +92,18 @@ internal sealed class HostedCloudPubLifetimeService(
         }
     }
 
+    public Task StartedAsync(CancellationToken cancellationToken)
+    {
+        callbackOnStarted?.Invoke(new CloudPubContext(client, state));
+        return Task.CompletedTask;
+    }
+
+    public Task StoppedAsync(CancellationToken cancellationToken)
+    {
+        callbackOnStopped?.Invoke(new CloudPubContext(client, state));
+        return Task.CompletedTask;
+    }
+
     public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task StartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

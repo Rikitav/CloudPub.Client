@@ -72,8 +72,9 @@ internal sealed class HostedCloudPubLocalhostProxyService(
         return Task.CompletedTask;
     }
 
-    public Task StoppingAsync(CancellationToken cancellationToken)
+    public Task StoppedAsync(CancellationToken cancellationToken)
     {
+        /*
         IServerAddressesFeature? addressesFeature = server.Features.Get<IServerAddressesFeature>();
         if (addressesFeature == null)
             return Task.CompletedTask;
@@ -92,12 +93,13 @@ internal sealed class HostedCloudPubLocalhostProxyService(
                     logger.LogError(ex, "Failed to remove localhost proxy address '{url}'", address);
             }
         }
+        */
 
         return Task.CompletedTask;
     }
 
     public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task StartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

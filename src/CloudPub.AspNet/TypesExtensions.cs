@@ -154,23 +154,34 @@ public static class CloudPubClientBuilderExtensions
 /// </summary>
 public sealed class CloudPubContext
 {
-    private readonly CloudPubHostingState HostingState;
+    private readonly ICloudPubClient _client;
+    private readonly CloudPubHostingState _hostingState;
 
-    internal CloudPubContext(CloudPubHostingState hostingState)
-        => HostingState = hostingState;
+    internal CloudPubContext(ICloudPubClient client, CloudPubHostingState hostingState)
+    {
+        _client = client;
+        _hostingState = hostingState;
+    }
 
     /// <summary>
     /// Gets the endpoints configured before startup.
     /// </summary>
-    public IEnumerable<CloudPubPublishOptions> PublishOptions => HostingState.PublishOptions.AsReadOnly();
+    public IEnumerable<CloudPubPublishOptions> PublishOptions => _hostingState.PublishOptions.AsReadOnly();
+
     /// <summary>
     /// Gets endpoints successfully published during application lifetime.
     /// </summary>
-    public IEnumerable<Endpoint> PublishedEndpoints => HostingState.PublishedEndpoints.AsReadOnly();
+    public IEnumerable<Endpoint> PublishedEndpoints => _hostingState.PublishedEndpoints.AsReadOnly();
+
     /// <summary>
     /// Gets currently configured proxy mode.
     /// </summary>
-    public CloudPubProxyMode ProxyMode => HostingState.ProxyMode;
+    public CloudPubProxyMode ProxyMode => _hostingState.ProxyMode;
+
+    /// <summary>
+    /// Gets the CloudPub client instance to interact with the service and query runtime state.
+    /// </summary>
+    public ICloudPubClient Client => _client;
 }
 
 /// <summary>
@@ -185,13 +196,29 @@ public static class WebApplicationHostExtensions
     /// <param name="app">Host instance.</param>
     /// <param name="useAction">Callback that receives a <see cref="CloudPubContext"/> snapshot.</param>
     /// <returns>The same host instance for chaining.</returns>
-    public static T UseCloudPub<T>(this T app, Action<CloudPubContext> useAction) where T : IHost
+    public static T OnCloudPubStarted<T>(this T app, Action<CloudPubContext> useAction) where T : IHost
     {
-        CloudPubHostingState hostingState = app.Services.GetService<CloudPubHostingState>()
+        HostedCloudPubLifetimeService lifetime = app.Services.GetServices<IHostedService>().OfType<HostedCloudPubLifetimeService>().FirstOrDefault()
             ?? throw new InvalidOperationException("CloudPubHostingState not found in services.");
 
-        IHostApplicationLifetime lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
-        lifetime.ApplicationStarted.Register(() => useAction.Invoke(new CloudPubContext(hostingState)));
+        lifetime.OnStarted(useAction);
+        return app;
+    }
+
+    /// <summary>
+    /// Registers a callback invoked when the host is stopping or has stopped.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="app"></param>
+    /// <param name="useAction"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public static T OnCloudPubStopped<T>(this T app, Action<CloudPubContext> useAction) where T : IHost
+    {
+        HostedCloudPubLifetimeService lifetime = app.Services.GetServices<IHostedService>().OfType<HostedCloudPubLifetimeService>().FirstOrDefault()
+            ?? throw new InvalidOperationException("CloudPubHostingState not found in services.");
+
+        lifetime.OnStopped(useAction);
         return app;
     }
 }

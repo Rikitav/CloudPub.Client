@@ -208,12 +208,17 @@
             Gets currently configured proxy mode.
             </summary>
         </member>
+        <member name="P:CloudPub.CloudPubContext.Client">
+            <summary>
+            Gets the CloudPub client instance to interact with the service and query runtime state.
+            </summary>
+        </member>
         <member name="T:CloudPub.WebApplicationHostExtensions">
             <summary>
             Host extensions for executing CloudPub callbacks when the app is started.
             </summary>
         </member>
-        <member name="M:CloudPub.WebApplicationHostExtensions.UseCloudPub``1(``0,System.Action{CloudPub.CloudPubContext})">
+        <member name="M:CloudPub.WebApplicationHostExtensions.OnCloudPubStarted``1(``0,System.Action{CloudPub.CloudPubContext})">
             <summary>
             Registers a callback invoked when the host reaches the started state.
             </summary>
@@ -221,6 +226,16 @@
             <param name="app">Host instance.</param>
             <param name="useAction">Callback that receives a <see cref="T:CloudPub.CloudPubContext"/> snapshot.</param>
             <returns>The same host instance for chaining.</returns>
+        </member>
+        <member name="M:CloudPub.WebApplicationHostExtensions.OnCloudPubStopped``1(``0,System.Action{CloudPub.CloudPubContext})">
+            <summary>
+            Registers a callback invoked when the host is stopping or has stopped.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="app"></param>
+            <param name="useAction"></param>
+            <returns></returns>
+            <exception cref="T:System.InvalidOperationException"></exception>
         </member>
     </members>
 </doc>

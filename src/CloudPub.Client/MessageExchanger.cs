@@ -87,6 +87,12 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
 
             switch (messgae.MessageCase)
             {
+                default:
+                    {
+                        Debug.WriteLine("Received unknown\\unsupported\\unhandled message of type '{0}'", messgae.MessageCase);
+                        break;
+                    }
+
                 case Message.MessageOneofCase.HeartBeat:
                     {
                         await socket.SendAsync(new Message { HeartBeat = new HeartBeat() }, cancellationToken).ConfigureAwait(false);
@@ -106,6 +112,18 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
                             _pendingRequests.Clear();
                         }
 
+                        break;
+                    }
+
+                case Message.MessageOneofCase.EndpointRemove:
+                case Message.MessageOneofCase.EndpointRemoveAck:
+                    {
+                        break;
+                    }
+
+                case Message.MessageOneofCase.EndpointStatus:
+                case Message.MessageOneofCase.EndpointStatusAck:
+                    {
                         break;
                     }
 

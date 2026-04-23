@@ -49,7 +49,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
 
     private CancellationTokenSource? _cancellation;
     private ClientWebSocket? _socket = null;
-    private Task? _hartbeatTask;
+    //private Task? _hartbeatTask;
     private Task? _receiveTask;
 
     /// <summary>
@@ -121,7 +121,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     {
         _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _receiveTask = ReceiveLoopAsync(exchanger, _cancellation.Token);
-        _hartbeatTask = HeartbeatLoopAsync(exchanger, _cancellation.Token);
+        //_hartbeatTask = HeartbeatLoopAsync(exchanger, _cancellation.Token);
 
         if (Options.ResumeEndpointsOnConnect)
             await SendAsync(new Message { EndpointStartAll = new EndpointStartAll() }, _cancellation.Token).ConfigureAwait(false);
@@ -152,6 +152,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
         }
     }
 
+    /*
     [DebuggerStepThrough]
     private async Task HeartbeatLoopAsync(IMessageExchanger exchanger, CancellationToken cancellationToken)
     {
@@ -176,6 +177,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
             Debug.WriteLine("Receiving loop exited! {0}", _socket?.State);
         }
     }
+    */
 
     [DebuggerStepThrough]
     private async Task ReceiveLoopAsync(IMessageExchanger exchanger, CancellationToken cancellationToken)
@@ -271,8 +273,10 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
         if (_receiveTask != null)
             await _receiveTask.ConfigureAwait(false);
         
+        /*
         if (_hartbeatTask != null)
             await _hartbeatTask.ConfigureAwait(false);
+        */
 
         if (_socket is { State: WebSocketState.Open })
         {

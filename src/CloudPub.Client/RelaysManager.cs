@@ -38,6 +38,7 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
 {
     private readonly ICloudPubRules Rules = rules;
     private readonly ConcurrentDictionary<uint, IDataChannelRelay> ChannelIdToRelayMap = [];
+    private readonly SemaphoreSlim relaySync = new SemaphoreSlim(1, 1); 
 
     /// <summary>
     /// Opens a local relay for the given channel id according to <paramref name="endpoint"/> (TCP by default, UDP when requested).
@@ -47,46 +48,60 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<IDataChannelRelay?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default)
     {
-        if (endpoint?.Client is null)
-            return null;
-
-        if (ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? existingRelay))
-            return existingRelay;
-
-        Func<IDataChannelRelay>? relayFactory = Rules.WhatRelayUseForProtocol(endpoint.Client.LocalProto);
-        if (relayFactory != null)
+        await relaySync.WaitAsync(cancellationToken);
+        try
         {
-            IDataChannelRelay relay = new BoundDataChannelRelay(channelId, relayFactory.Invoke());
-            IDataChannelRelay storedRelay = ChannelIdToRelayMap.GetOrAdd(channelId, relay);
-            Debug.WriteLine($"CloudPub relay created (custom), channelId={channelId}, storedNew={ReferenceEquals(storedRelay, relay)}");
-            return storedRelay;
+            if (endpoint?.Client is null)
+                return null;
+
+            if (ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? existingRelay))
+                return existingRelay;
+
+            Func<IDataChannelRelay>? relayFactory = Rules.WhatRelayUseForProtocol(endpoint.Client.LocalProto);
+            if (relayFactory != null)
+            {
+                IDataChannelRelay relay = new BoundDataChannelRelay(channelId, relayFactory.Invoke());
+                IDataChannelRelay storedRelay = ChannelIdToRelayMap.GetOrAdd(channelId, relay);
+                Debug.WriteLine($"CloudPub relay created (custom), channelId={channelId}, storedNew={ReferenceEquals(storedRelay, relay)}");
+                return storedRelay;
+            }
+
+            IDataChannelRelay createdRelay;
+            string localAddr = endpoint.Client.LocalAddr;
+            uint localPort = endpoint.Client.LocalPort;
+
+            switch (endpoint.Client.LocalProto)
+            {
+                case ProtocolType.Udp:
+                    {
+                        createdRelay = await UdpDataChannelRelay
+                            .CreateAsync(channelId, localAddr, localPort, cancellationToken)
+                            .ConfigureAwait(false);
+
+                        break;
+                    }
+
+                default:
+                    {
+                        createdRelay = await TcpDataChannelRelay
+                            .CreateAsync(channelId, localAddr, localPort, cancellationToken)
+                            .ConfigureAwait(false);
+
+                        break;
+                    }
+            }
+
+            IDataChannelRelay relayInMap = ChannelIdToRelayMap.GetOrAdd(channelId, createdRelay);
+            if (!ReferenceEquals(relayInMap, createdRelay))
+                await createdRelay.DisposeAsync().ConfigureAwait(false);
+
+            Debug.WriteLine($"CloudPub relay created, channelId={channelId}, protocol={endpoint.Client.LocalProto}, addr={localAddr}:{localPort}");
+            return relayInMap;
         }
-
-        IDataChannelRelay createdRelay;
-        string localAddr = endpoint.Client.LocalAddr;
-        uint localPort = (ushort)endpoint.Client.LocalPort;
-
-        switch (endpoint.Client.LocalProto)
+        finally
         {
-            case ProtocolType.Udp:
-                createdRelay = await UdpDataChannelRelay
-                    .CreateAsync(channelId, localAddr, localPort, cancellationToken)
-                    .ConfigureAwait(false);
-                break;
-
-            default:
-                createdRelay = await TcpDataChannelRelay
-                    .CreateAsync(channelId, localAddr, localPort, cancellationToken)
-                    .ConfigureAwait(false);
-                break;
+            relaySync.Release();
         }
-
-        IDataChannelRelay relayInMap = ChannelIdToRelayMap.GetOrAdd(channelId, createdRelay);
-        if (!ReferenceEquals(relayInMap, createdRelay))
-            await createdRelay.DisposeAsync().ConfigureAwait(false);
-
-        Debug.WriteLine($"CloudPub relay created, channelId={channelId}, protocol={endpoint.Client.LocalProto}, addr={localAddr}:{localPort}");
-        return relayInMap;
     }
 
     /// <summary>
@@ -97,12 +112,20 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<uint> WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default)
     {
-        if (!ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? relay))
-            return 0;
+        await relaySync.WaitAsync(cancellationToken);
+        try
+        {
+            if (!ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? relay))
+                return 0;
 
-        await relay.WriteAsync(data, cancellationToken).ConfigureAwait(false);
-        Debug.WriteLine($"CloudPub relay consumed chunk, channelId={channelId}, bytes={data.Length}, total={relay.TotalConsumed}");
-        return relay.TotalConsumed;
+            await relay.WriteAsync(data, cancellationToken).ConfigureAwait(false);
+            Debug.WriteLine($"CloudPub relay consumed chunk, channelId={channelId}, bytes={data.Length}, total={relay.TotalConsumed}");
+            return relay.TotalConsumed;
+        }
+        finally
+        {
+            relaySync.Release();
+        }
     }
 
     /// <summary>
@@ -112,12 +135,20 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task DeleteDataChannel(uint channelId, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!ChannelIdToRelayMap.TryRemove(channelId, out IDataChannelRelay? relay))
-            return;
+        await relaySync.WaitAsync(cancellationToken);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!ChannelIdToRelayMap.TryRemove(channelId, out IDataChannelRelay? relay))
+                return;
 
-        await relay.DisposeAsync().ConfigureAwait(false);
-        Debug.WriteLine($"CloudPub relay disposed, channelId={channelId}");
+            await relay.DisposeAsync().ConfigureAwait(false);
+            Debug.WriteLine($"CloudPub relay disposed, channelId={channelId}");
+        }
+        finally
+        {
+            relaySync.Release();
+        }
     }
 
     private sealed class BoundDataChannelRelay(uint channelId, IDataChannelRelay innerRelay) : IDataChannelRelay
