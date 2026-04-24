@@ -123,6 +123,7 @@ public class CloudPubClient : ICloudPubClient
         if (!disposing)
             return;
 
+        await _relays.DisposeAsync().ConfigureAwait(false);
         await _exchanger.DisposeAsync().ConfigureAwait(false);
         await _socket.DisposeAsync().ConfigureAwait(false);
     }

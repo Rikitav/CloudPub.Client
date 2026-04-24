@@ -48,11 +48,6 @@ public class RelayState(uint channelId, IDataChannelRelay relay) : IAsyncDisposa
     public IDataChannelRelay Relay => relay;
 
     /// <summary>
-    /// Actions syncking semaphore
-    /// </summary>
-    public SemaphoreSlim ActionsSync { get; } = new SemaphoreSlim(1, 1);
-    
-    /// <summary>
     /// Stopping token
     /// </summary>
     public CancellationTokenSource Stoping { get; } = new CancellationTokenSource();
@@ -122,7 +117,6 @@ public class RelayState(uint channelId, IDataChannelRelay relay) : IAsyncDisposa
         if (_receivingTask != null)
             await _receivingTask;
 
-        ActionsSync.Dispose();
         await relay.DisposeAsync().ConfigureAwait(false);
     }
 }
@@ -130,7 +124,7 @@ public class RelayState(uint channelId, IDataChannelRelay relay) : IAsyncDisposa
 /// <summary>
 /// Manages per-channel relays that connect CloudPub data channels to local services.
 /// </summary>
-public interface IRelaysManager
+public interface IRelaysManager : IAsyncDisposable
 {
     /// <summary>
     /// Opens a relay for an incoming data channel targeting a local <see cref="CloudPub.Protocol.ServerEndpoint"/>.

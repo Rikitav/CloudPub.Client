@@ -38,6 +38,10 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
 {
     private readonly ICloudPubRules Rules = rules;
     private readonly ConcurrentDictionary<uint, RelayState> RelayStates = [];
+    private readonly ConcurrentDictionary<uint, SemaphoreSlim> RelaySyncs = [];
+
+    private bool disposing = true;
+    private bool disposed;
 
     /// <summary>
     /// Opens a local relay for the given channel id according to <paramref name="endpoint"/> (TCP by default, UDP when requested).
@@ -47,18 +51,21 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<RelayState?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default)
     {
-        if (RelayStates.TryGetValue(channelId, out RelayState? state))
-            await state.ActionsSync.WaitAsync(cancellationToken);
+        if (disposing)
+            return null;
+
+        SemaphoreSlim sync = RelaySyncs.GetOrAdd(channelId, _ => new SemaphoreSlim(1, 1));
+        await sync.WaitAsync(cancellationToken);
 
         try
         {
             if (endpoint?.Client is null)
                 return null;
 
-            if (RelayStates.TryGetValue(channelId, out RelayState? existingRelay))
+            if (RelayStates.TryGetValue(channelId, out RelayState? state))
             {
                 Debug.WriteLine("CloudPub relay already exists for channelId={channelId}, reusing.");
-                return existingRelay;
+                return state;
             }
 
             Func<IDataChannelRelay>? relayFactory = Rules.GetCustomProtocolRelay(endpoint.Client.LocalProto);
@@ -105,7 +112,7 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
         }
         finally
         {
-            state?.ActionsSync.Release();
+            sync.Release();
         }
     }
 
@@ -117,12 +124,15 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<uint> WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default)
     {
-        if (RelayStates.TryGetValue(channelId, out RelayState? state))
-            await state.ActionsSync.WaitAsync(cancellationToken);
+        if (disposing)
+            return 0;
+
+        SemaphoreSlim sync = RelaySyncs.GetOrAdd(channelId, _ => new SemaphoreSlim(1, 1));
+        await sync.WaitAsync(cancellationToken);
 
         try
         {
-            if (state == null)
+            if (!RelayStates.TryGetValue(channelId, out RelayState state))
             {
                 Debug.WriteLine("CloudPub relay not found for writing, channelId={channelId}");
                 return 0;
@@ -136,7 +146,7 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
         }
         finally
         {
-            state?.ActionsSync.Release();
+            sync.Release();
         }
     }
 
@@ -147,13 +157,16 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task DeleteDataChannel(uint channelId, CancellationToken cancellationToken = default)
     {
-        if (RelayStates.TryGetValue(channelId, out RelayState? state))
-            await state.ActionsSync.WaitAsync(cancellationToken);
+        if (disposing)
+            return;
+
+        SemaphoreSlim sync = RelaySyncs.GetOrAdd(channelId, _ => new SemaphoreSlim(1, 1));
+        await sync.WaitAsync(cancellationToken);
 
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!RelayStates.TryRemove(channelId, out state))
+            if (!RelayStates.TryRemove(channelId, out RelayState? state))
             {
                 Debug.WriteLine($"CloudPub relay not found for deletion, channelId={channelId}");
                 return;
@@ -164,8 +177,30 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
         }
         finally
         {
-            state.ActionsSync.Release();
+            sync.Release();
         }
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed)
+            return;
+
+        disposing = true;
+        await Task.WhenAll(RelayStates.Values.Select(r => r.DisposeAsync().AsTask()).ToArray()).ConfigureAwait(false);
+        
+        foreach (SemaphoreSlim sync in RelaySyncs.Values)
+        {
+            await sync.WaitAsync().ConfigureAwait(false);
+            sync.Dispose();
+        }
+
+        RelayStates.Clear();
+        RelaySyncs.Clear();
+
+        GC.SuppressFinalize(this);
+        disposed = true;
     }
 
     private sealed class BoundDataChannelRelay(uint channelId, IDataChannelRelay innerRelay) : IDataChannelRelay

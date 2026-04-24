@@ -250,11 +250,6 @@
             Data relay instance
             </summary>
         </member>
-        <member name="P:CloudPub.Components.RelayState.ActionsSync">
-            <summary>
-            Actions syncking semaphore
-            </summary>
-        </member>
         <member name="P:CloudPub.Components.RelayState.Stoping">
             <summary>
             Stopping token
@@ -502,6 +497,9 @@
             </summary>
             <param name="channelId">Data channel identifier to tear down.</param>
             <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="M:CloudPub.RelaysManager.DisposeAsync">
+            <inheritdoc/>
         </member>
         <member name="T:CloudPub.SocketTransport">
             <summary>
