@@ -226,6 +226,50 @@
             <param name="messgae">The received message.</param>
             <param name="cancellationToken">A token to cancel outbound operations.</param>
         </member>
+        <member name="T:CloudPub.Components.RelayState">
+            <summary>
+            Stores <see cref="T:CloudPub.Components.IDataChannelRelay"/> instance with stopping token
+            </summary>
+            <param name="channelId"></param>
+            <param name="relay"></param>
+        </member>
+        <member name="M:CloudPub.Components.RelayState.#ctor(System.UInt32,CloudPub.Components.IDataChannelRelay)">
+            <summary>
+            Stores <see cref="T:CloudPub.Components.IDataChannelRelay"/> instance with stopping token
+            </summary>
+            <param name="channelId"></param>
+            <param name="relay"></param>
+        </member>
+        <member name="P:CloudPub.Components.RelayState.ChannelId">
+            <summary>
+            Server assigned channel ID
+            </summary>
+        </member>
+        <member name="P:CloudPub.Components.RelayState.Relay">
+            <summary>
+            Data relay instance
+            </summary>
+        </member>
+        <member name="P:CloudPub.Components.RelayState.ActionsSync">
+            <summary>
+            Actions syncking semaphore
+            </summary>
+        </member>
+        <member name="P:CloudPub.Components.RelayState.Stoping">
+            <summary>
+            Stopping token
+            </summary>
+        </member>
+        <member name="M:CloudPub.Components.RelayState.BeginReadAsync(CloudPub.Components.ISocketTransport,System.Threading.CancellationToken)">
+            <summary>
+            Begins to continously read data from socket
+            </summary>
+            <param name="socket"></param>
+            <param name="cancellationToken"></param>
+        </member>
+        <member name="M:CloudPub.Components.RelayState.DisposeAsync">
+            <inheritdoc/>
+        </member>
         <member name="T:CloudPub.Components.IRelaysManager">
             <summary>
             Manages per-channel relays that connect CloudPub data channels to local services.

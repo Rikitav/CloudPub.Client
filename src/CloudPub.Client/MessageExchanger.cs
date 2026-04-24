@@ -151,7 +151,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
                         uint channelId = messgae.CreateDataChannelWithId.ChannelId;
                         ServerEndpoint endpoint = messgae.CreateDataChannelWithId.Endpoint;
 
-                        _ = CreateDataChannel(socket, channelId, endpoint, cancellationToken);
+                        CreateDataChannel(socket, channelId, endpoint, cancellationToken);
                         break;
                     }
 
@@ -159,7 +159,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
                     {
                         uint channelId = messgae.DataChannelEof.ChannelId;
                         
-                        _ = DeleteDataChannel(socket, channelId, cancellationToken);
+                        DeleteDataChannel(socket, channelId, cancellationToken);
                         break;
                     }
 
@@ -180,7 +180,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
                         uint channelId = messgae.DataChannelData.ChannelId;
                         byte[] data = messgae.DataChannelData.Data.ToArray();
 
-                        _ = WriteDataChannel(socket, channelId, data, cancellationToken);
+                        WriteDataChannel(socket, channelId, data, cancellationToken);
                         break;
                     }
 
@@ -189,7 +189,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
                         uint channelId = messgae.DataChannelDataUdp.ChannelId;
                         byte[] data = messgae.DataChannelDataUdp.Data.ToArray();
 
-                        _ = WriteDataChannel(socket, channelId, data, cancellationToken);
+                        WriteDataChannel(socket, channelId, data, cancellationToken);
                         break;
                     }
             }
@@ -215,18 +215,22 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
         await Task.Yield();
     }
 
-    private async Task CreateDataChannel(ISocketTransport socket, uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken)
+    private async void CreateDataChannel(ISocketTransport socket, uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken)
     {
         try
         {
-            IDataChannelRelay? relay = await _relays.CreateDataChannel(channelId, endpoint, cancellationToken);
+            RelayState? relay = await _relays.CreateDataChannel(channelId, endpoint, cancellationToken);
             if (relay is null)
             {
                 Debug.WriteLine($"Failed to create relay for channelId={channelId}. Manager returned null.");
                 return;
             }
 
-            _ = BeginReadAsync(socket, relay, cancellationToken);
+            relay.BeginReadAsync(socket, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            await _relays.DeleteDataChannel(channelId, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -239,7 +243,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
         }
     }
 
-    private async Task DeleteDataChannel(ISocketTransport socket, uint channelId, CancellationToken cancellationToken)
+    private async void DeleteDataChannel(ISocketTransport socket, uint channelId, CancellationToken cancellationToken)
     {
         try
         {
@@ -256,7 +260,7 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
         }
     }
 
-    private async Task WriteDataChannel(ISocketTransport socket, uint channelId, byte[] data, CancellationToken cancellationToken)
+    private async void WriteDataChannel(ISocketTransport socket, uint channelId, byte[] data, CancellationToken cancellationToken)
     {
         try
         {
@@ -276,44 +280,6 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
             };
 
             await socket.SendAsync(exceptionMsg, cancellationToken).ConfigureAwait(false);
-        }
-    }
-
-    private async Task BeginReadAsync(ISocketTransport socket, IDataChannelRelay relay, CancellationToken cancellationToken)
-    {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            try
-            {
-                ReadOnlyMemory<byte> data = await relay.ReadAsync(cancellationToken);
-                if (data.IsEmpty)
-                    break;
-
-                Message message = new Message();
-                if (relay is UdpDataChannelRelay)
-                {
-                    message.DataChannelDataUdp = new DataChannelDataUdp
-                    {
-                        ChannelId = relay.ChannelId,
-                        Data = ByteString.CopyFrom(data.ToArray())
-                    };
-                }
-                else
-                {
-                    message.DataChannelData = new DataChannelData()
-                    {
-                        ChannelId = relay.ChannelId,
-                        Data = ByteString.CopyFrom(data.ToArray())
-                    };
-                }
-
-                await socket.SendAsync(message, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception exc)
-            {
-                Debug.WriteLine($"CloudPub relay read loop failed for channelId={relay.ChannelId}: {exc}");
-                break;
-            }
         }
     }
 

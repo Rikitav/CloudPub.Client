@@ -21,9 +21,111 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+using CloudPub.ChannelRelays;
 using CloudPub.Protocol;
+using Google.Protobuf;
+using System.Diagnostics;
 
 namespace CloudPub.Components;
+
+/// <summary>
+/// Stores <see cref="IDataChannelRelay"/> instance with stopping token
+/// </summary>
+/// <param name="channelId"></param>
+/// <param name="relay"></param>
+public class RelayState(uint channelId, IDataChannelRelay relay) : IAsyncDisposable
+{
+    private Task? _receivingTask;
+
+    /// <summary>
+    /// Server assigned channel ID
+    /// </summary>
+    public uint ChannelId => channelId;
+
+    /// <summary>
+    /// Data relay instance
+    /// </summary>
+    public IDataChannelRelay Relay => relay;
+
+    /// <summary>
+    /// Actions syncking semaphore
+    /// </summary>
+    public SemaphoreSlim ActionsSync { get; } = new SemaphoreSlim(1, 1);
+    
+    /// <summary>
+    /// Stopping token
+    /// </summary>
+    public CancellationTokenSource Stoping { get; } = new CancellationTokenSource();
+
+    /// <summary>
+    /// Begins to continously read data from socket
+    /// </summary>
+    /// <param name="socket"></param>
+    /// <param name="cancellationToken"></param>
+    public async void BeginReadAsync(ISocketTransport socket, CancellationToken cancellationToken)
+    {
+        if (_receivingTask != null)
+            throw new InvalidOperationException("This relay is already receiving data");
+
+        cancellationToken.ThrowIfCancellationRequested();
+        _receivingTask = Task.Factory.StartNew(
+            () => BeginReadAsyncInternal(socket),
+            TaskCreationOptions.LongRunning);
+    }
+
+    private async Task BeginReadAsyncInternal(ISocketTransport socket)
+    {
+        while (!Stoping.IsCancellationRequested)
+        {
+            try
+            {
+                ReadOnlyMemory<byte> data = await Relay.ReadAsync(Stoping.Token);
+                if (data.IsEmpty)
+                    break;
+
+                Message message = new Message();
+                if (relay is UdpDataChannelRelay)
+                {
+                    message.DataChannelDataUdp = new DataChannelDataUdp
+                    {
+                        ChannelId = ChannelId,
+                        Data = ByteString.CopyFrom(data.ToArray())
+                    };
+                }
+                else
+                {
+                    message.DataChannelData = new DataChannelData()
+                    {
+                        ChannelId = ChannelId,
+                        Data = ByteString.CopyFrom(data.ToArray())
+                    };
+                }
+
+                await socket.SendAsync(message, Stoping.Token).ConfigureAwait(false);
+            }
+            catch (Exception exc)
+            {
+                Debug.WriteLine($"CloudPub relay read loop failed for channelId={ChannelId}: {exc}");
+                break;
+            }
+        }
+
+        Debug.WriteLine($"CloudPub relay read loop stopped for channelId={relay.ChannelId}");
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+    {
+        Stoping.Cancel();
+        Stoping.Dispose();
+
+        if (_receivingTask != null)
+            await _receivingTask;
+
+        ActionsSync.Dispose();
+        await relay.DisposeAsync().ConfigureAwait(false);
+    }
+}
 
 /// <summary>
 /// Manages per-channel relays that connect CloudPub data channels to local services.
@@ -36,7 +138,7 @@ public interface IRelaysManager
     /// <param name="channelId">Server-assigned channel id.</param>
     /// <param name="endpoint">Local bind/connect parameters from the server.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task<IDataChannelRelay?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default);
+    Task<RelayState?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Forwards tunneled bytes to the relay for <paramref name="channelId"/>.
