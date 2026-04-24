@@ -62,7 +62,7 @@ public class SocketTransport(CloudPubClientOptions options, IAuthFacility authFa
     /// and stores the session token on success.
     /// </summary>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    //[DebuggerStepThrough]
+    [DebuggerStepThrough]
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         if (_socket is { State: WebSocketState.Open })

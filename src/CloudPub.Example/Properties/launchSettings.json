@@ -2,7 +2,7 @@
   "profiles": {
     "CloudPub.Example": {
       "commandName": "Project",
-      "commandLineArgs": "publish-http 5155",
+      "commandLineArgs": "publish-http 5155 --wait",
       "environmentVariables": {
         "CLOUDPUB_TOKEN": "zVbUn7ZFYyVroIjIOoKhOTsvnC3fxnhao92WCV5qA8Y"
       }

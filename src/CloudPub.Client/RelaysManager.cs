@@ -40,7 +40,7 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     private readonly ConcurrentDictionary<uint, RelayState> RelayStates = [];
     private readonly ConcurrentDictionary<uint, SemaphoreSlim> RelaySyncs = [];
 
-    private bool disposing = true;
+    private bool disposing;
     private bool disposed;
 
     /// <summary>
@@ -51,6 +51,9 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<RelayState?> CreateDataChannel(uint channelId, ServerEndpoint endpoint, CancellationToken cancellationToken = default)
     {
+        if (disposed)
+            throw new ObjectDisposedException(nameof(RelaysManager));
+
         if (disposing)
             return null;
 
@@ -124,6 +127,9 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task<uint> WriteDataChannel(uint channelId, byte[] data, CancellationToken cancellationToken = default)
     {
+        if (disposed)
+            throw new ObjectDisposedException(nameof(RelaysManager));
+
         if (disposing)
             return 0;
 
@@ -157,6 +163,9 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     public async Task DeleteDataChannel(uint channelId, CancellationToken cancellationToken = default)
     {
+        if (disposed)
+            throw new ObjectDisposedException(nameof(RelaysManager));
+
         if (disposing)
             return;
 
@@ -184,6 +193,9 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
+        if (disposed)
+            throw new ObjectDisposedException(nameof(RelaysManager));
+
         if (disposed)
             return;
 
