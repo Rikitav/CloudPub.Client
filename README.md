@@ -185,6 +185,23 @@ builder.Services
 
 `WithLocalhostProxy()` and `WithPipelineProxy()` are mutually exclusive.
 
+### 3. Add Post\Pre connection actions
+
+Use WebApplication extension method `OnCloudPubStarted` and `OnCloudPubStopped`
+
+```csharp
+WebApplication app = builder.Build();
+app.OnCloudPubStarted(ctx =>
+{
+    Endpoint endpoint = ctx.PublishedEndpoints.FirstOrDefault()
+        ?? throw new InvalidOperationException("No endpoints found");
+
+    telegramBotClient.RemapWebhook(endpoint.Url + "telegram/");
+});
+
+app.Run();
+```
+
 ### Full minimal `Program.cs` sketch
 
 ```csharp
