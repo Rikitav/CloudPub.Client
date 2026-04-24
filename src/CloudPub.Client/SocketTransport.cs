@@ -38,13 +38,13 @@ namespace CloudPub;
 /// and runs a receive loop dispatching messages to an <see cref="IMessageExchanger"/>.
 /// </summary>
 /// <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
-/// <param name="rules"></param>
-public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules) : ISocketTransport
+/// <param name="authFacility"></param>
+public class SocketTransport(CloudPubClientOptions options, IAuthFacility authFacility) : ISocketTransport
 {
     private const string DefaultClientVersion = "3.0.2";
     private const string WebSocketPath = "/endpoint/v3";
 
-    private readonly ICloudPubRules _rules = rules;
+    private readonly IAuthFacility _authFacility = authFacility;
     private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
 
     private CancellationTokenSource? _cancellation;
@@ -62,7 +62,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     /// and stores the session token on success.
     /// </summary>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    [DebuggerStepThrough]
+    //[DebuggerStepThrough]
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         if (_socket is { State: WebSocketState.Open })
@@ -70,6 +70,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
 
         Uri serverUri = Options.ServerUri ?? new Uri("https://cloudpub.ru");
         string hostAndPort = serverUri.ToHostAndPort();
+        string? agentId = await _authFacility.TryLoadAgentIdAsync(true);
 
         CancellationTokenSource? connectCancellation = null;
         while (connectCancellation?.IsCancellationRequested is not true)
@@ -85,7 +86,14 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
             _socket.Options.Proxy = Options.Proxy;
 
             await _socket.ConnectAsync(BuildWebSocketUri(serverUri, hostAndPort), connectCancellation.Token).ConfigureAwait(false);
-            await SendAsync(new Message { AgentHello = BuildAgentHello(Options, hostAndPort) }, connectCancellation.Token).ConfigureAwait(false);
+
+            AgentInfo agent = BuildAgentHello(Options, agentId, hostAndPort);
+            await SendAsync(new Message { AgentHello = agent }, connectCancellation.Token).ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(agentId))
+            {
+                await _authFacility.TrySaveAgentIdAsync(true, agent.AgentId);
+            }
 
             using CancellationTokenSource handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(connectCancellation.Token);
             handshakeCts.CancelAfter(Options.Timeout);
@@ -296,7 +304,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
     }
 
     [DebuggerStepThrough]
-    private static AgentInfo BuildAgentHello(CloudPubClientOptions options, string hostAndPort)
+    private static AgentInfo BuildAgentHello(CloudPubClientOptions options, string? agentId, string hostAndPort)
     {
         string platform = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
             ? "windows" : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
@@ -304,7 +312,7 @@ public class SocketTransport(CloudPubClientOptions options, ICloudPubRules rules
 
         return new AgentInfo()
         {
-            AgentId = string.IsNullOrEmpty(options.AgentId) ? Guid.NewGuid().ToString("D") : options.AgentId,
+            AgentId = string.IsNullOrEmpty(agentId) ? Guid.NewGuid().ToString("D") : agentId,
             Token = options.Token ?? "",
             Hostname = Environment.MachineName,
             Version = string.IsNullOrEmpty(options.ClientVersion) ? DefaultClientVersion : options.ClientVersion,

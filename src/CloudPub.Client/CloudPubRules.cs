@@ -35,17 +35,14 @@ public class CloudPubRules : ICloudPubRules
     private readonly ConcurrentDictionary<ProtocolType, Func<IDataChannelRelay>> useRelayForProtocolMap = [];
 
     /// <inheritdoc />
-    public void UseRelayForProtocol(ProtocolType protocolType, Func<IDataChannelRelay> relayFactory)
+    public void AddCustomProtocolRelay(ProtocolType protocolType, Func<IDataChannelRelay> relayFactory)
     {
         useRelayForProtocolMap.AddOrUpdate(protocolType, relayFactory, (_, _) => relayFactory);
     }
 
     /// <inheritdoc />
-    public Func<IDataChannelRelay>? WhatRelayUseForProtocol(ProtocolType protocolType)
+    public Func<IDataChannelRelay>? GetCustomProtocolRelay(ProtocolType protocolType)
     {
-        if (useRelayForProtocolMap.TryGetValue(protocolType, out Func<IDataChannelRelay> relayFactory)) 
-            return relayFactory;
-
-        return null;
+        return useRelayForProtocolMap.GetValueOrDefault(protocolType);
     }
 }

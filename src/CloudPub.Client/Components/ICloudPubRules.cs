@@ -35,12 +35,12 @@ public interface ICloudPubRules
     /// </summary>
     /// <param name="protocolType">Protocol to bind.</param>
     /// <param name="relayFactory">Factory that creates a relay instance for that protocol.</param>
-    void UseRelayForProtocol(ProtocolType protocolType, Func<IDataChannelRelay> relayFactory);
+    void AddCustomProtocolRelay(ProtocolType protocolType, Func<IDataChannelRelay> relayFactory);
 
     /// <summary>
     /// Resolves the relay factory for a protocol, if it was registered.
     /// </summary>
     /// <param name="protocolType">Protocol to resolve.</param>
     /// <returns>The registered relay factory, or <c>null</c> if none was configured.</returns>
-    Func<IDataChannelRelay>? WhatRelayUseForProtocol(ProtocolType protocolType);
+    Func<IDataChannelRelay>? GetCustomProtocolRelay(ProtocolType protocolType);
 }

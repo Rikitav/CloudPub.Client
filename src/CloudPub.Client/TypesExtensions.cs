@@ -213,45 +213,6 @@ public static class TypesExtensions
     private static int GetPort(Uri serverUri) => serverUri.IsDefaultPort ? (serverUri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ? 80 : 443) : serverUri.Port;
 }
 
-/*
-/// <summary>
-/// Helpers to wait for and filter messages from an <see cref="CloudPub.Components.IMessageExchanger"/>.
-/// </summary>
-public static class MessageExchangerExtensions
-{
-    /// <summary>
-    /// Waits until a message whose kind is one of <paramref name="types"/> is available, skipping others.
-    /// </summary>
-    /// <param name="exchanger">The message source.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <param name="types">Accepted message kinds.</param>
-    /// <returns>The first matching message.</returns>
-    public static async ValueTask<Message> WaitMessageOfType(this IMessageExchanger exchanger, CancellationToken cancellationToken, params Message.MessageOneofCase[] types)
-    {
-        while (true)
-        {
-            await exchanger.WaitForMessagesAsync();
-            Message? message = await exchanger.ReadMessageOfType(cancellationToken, types);
-
-            if (message != null)
-                return message;
-        }
-    }
-
-    /// <summary>
-    /// Reads from the asynchronous stream and returns the first message whose kind is in <paramref name="types"/>,
-    /// or <c>null</c> if the stream ends before a match.
-    /// </summary>
-    /// <param name="exchanger">The message source.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <param name="types">Accepted message kinds.</param>
-    public static async ValueTask<Message?> ReadMessageOfType(this IMessageExchanger exchanger, CancellationToken cancellationToken, params Message.MessageOneofCase[] types)
-    {
-        return await exchanger.ReadMessagesAsync().FirstOrDefaultAsync(msg => types.Contains(msg.MessageCase), cancellationToken);
-    }
-}
-*/
-
 /// <summary>
 /// Builds a protobuf <see cref="ClientEndpoint"/> from high-level <see cref="CloudPub.Options.CloudPubPublishOptions"/>.
 /// </summary>

@@ -37,6 +37,7 @@ public class CloudPubClient : ICloudPubClient
     private readonly SocketTransport _socket;
     private readonly RelaysManager _relays;
     private readonly MessageExchanger _exchanger;
+    private readonly LocalAuthFacility _authFacility;
 
     private bool isDisposed = false;
 
@@ -49,7 +50,9 @@ public class CloudPubClient : ICloudPubClient
     {
         _options = options;
         _relays = new RelaysManager(rules);
-        _socket = new SocketTransport(options, rules);
+        _authFacility = new LocalAuthFacility();
+
+        _socket = new SocketTransport(options, _authFacility);
         _exchanger = new MessageExchanger(options, rules, _relays);
     }
 

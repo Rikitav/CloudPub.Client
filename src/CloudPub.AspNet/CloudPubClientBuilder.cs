@@ -111,8 +111,8 @@ internal sealed class CloudPubClientBuilder(IServiceCollection services) : IClou
     private static Components.ICloudPubRules RulesFactory(IServiceProvider serviceProvider)
     {
         CloudPubRules rules = new CloudPubRules();
-        rules.UseRelayForProtocol(ProtocolType.Http, () => ActivatorUtilities.CreateInstance<ChannelRelays.TcpToHttpRelayChannel>(serviceProvider));
-        rules.UseRelayForProtocol(ProtocolType.Https, () => ActivatorUtilities.CreateInstance<ChannelRelays.TcpToHttpRelayChannel>(serviceProvider));
+        rules.AddCustomProtocolRelay(ProtocolType.Http, () => ActivatorUtilities.CreateInstance<ChannelRelays.TcpToHttpRelayChannel>(serviceProvider));
+        rules.AddCustomProtocolRelay(ProtocolType.Https, () => ActivatorUtilities.CreateInstance<ChannelRelays.TcpToHttpRelayChannel>(serviceProvider));
         return rules;
     }
 }

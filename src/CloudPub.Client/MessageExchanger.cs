@@ -60,13 +60,11 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
             _pendingRequests.TryAdd(messageType, completionSource);
         }
 
-        using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(static state =>
+        await using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(() =>
         {
-            var tuple = ((ConcurrentDictionary<Message.MessageOneofCase, TaskCompletionSource<Message>>, Message.MessageOneofCase))state!;
-            if (tuple.Item1.TryRemove(tuple.Item2, out TaskCompletionSource<Message>? tcs))
+            if (_pendingRequests.TryRemove(messageType, out TaskCompletionSource<Message>? tcs))
                 tcs.TrySetCanceled();
-
-        }, (_pendingRequests, messageType));
+        });
 
         return await completionSource.Task.ConfigureAwait(false);
     }
@@ -223,7 +221,10 @@ public sealed class MessageExchanger(CloudPubClientOptions options, ICloudPubRul
         {
             IDataChannelRelay? relay = await _relays.CreateDataChannel(channelId, endpoint, cancellationToken);
             if (relay is null)
+            {
+                Debug.WriteLine($"Failed to create relay for channelId={channelId}. Manager returned null.");
                 return;
+            }
 
             _ = BeginReadAsync(socket, relay, cancellationToken);
         }

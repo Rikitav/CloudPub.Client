@@ -59,6 +59,7 @@ internal sealed class HostedCloudPubLifetimeService(
 
                 if (logger.IsEnabled(LogLevel.Information))
                     logger.LogInformation("Now listening on '{url}'", registeredEndpoint.Url);
+
                 Debug.WriteLine($"CloudPub endpoint published: guid={registeredEndpoint.Guid}, url={registeredEndpoint.Url}");
             }
             catch (Exception ex)
@@ -82,6 +83,7 @@ internal sealed class HostedCloudPubLifetimeService(
                 await client.UnpublishAsync(endpoint, cancellationToken).ConfigureAwait(false);
                 if (logger.IsEnabled(LogLevel.Information))
                     logger.LogInformation("Successfully unpublished endpoint {url}", endpoint.Url);
+
                 Debug.WriteLine($"CloudPub endpoint unpublished: guid={endpoint.Guid}, url={endpoint.Url}");
             }
             catch (Exception ex)

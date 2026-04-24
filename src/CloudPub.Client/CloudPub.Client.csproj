@@ -13,12 +13,12 @@
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
 	  
     <Title>CloudPub.Client</Title>
-    <Version>1.5.5</Version>
+    <Version>1.5.6</Version>
 	<Authors>CloudPub;Rikitav Tim4ik</Authors>
 	<Company>CloudPub;Rikitav Tim4ik</Company>
     <RepositoryUrl>https://github.com/Rikitav/CloudPub.Client</RepositoryUrl>
 	<PackageProjectUrl>https://cloudpub.ru/</PackageProjectUrl>
-	<Description>The CloudPub Rust SDK provides a simple interface for interacting with the CloudPub platform. CloudPub provides secure tunneling and service publishing, allowing you to securely expose local services to the internet.</Description>
+	<Description>The CloudPub C# SDK provides a simple interface for interacting with the CloudPub platform. CloudPub provides secure tunneling and service publishing, allowing you to securely expose local services to the internet.</Description>
     <PackageTags>networking;tcp;proxy;udp;domain;ngrok;publish;relay-server;ngrok-alternative;cloudpub</PackageTags>
 	  
     <PackageIcon>cloudpub_nuget.png</PackageIcon>
@@ -27,6 +27,7 @@
 	  
 	<BaseOutputPath>..\..\bin</BaseOutputPath>
 	<DocumentationFile>..\..\docs\$(AssemblyName).xml</DocumentationFile>
+	<UserSecretsId>af2a4ba8-d425-47ef-b6ad-620144a86a45</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -41,6 +42,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Tomlyn.Signed" Version="2.3.2" />
   </ItemGroup>
 
   <ItemGroup>

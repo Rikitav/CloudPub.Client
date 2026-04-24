@@ -57,9 +57,12 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
                 return null;
 
             if (ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? existingRelay))
+            {
+                Debug.WriteLine("CloudPub relay already exists for channelId={channelId}, reusing.");
                 return existingRelay;
+            }
 
-            Func<IDataChannelRelay>? relayFactory = Rules.WhatRelayUseForProtocol(endpoint.Client.LocalProto);
+            Func<IDataChannelRelay>? relayFactory = Rules.GetCustomProtocolRelay(endpoint.Client.LocalProto);
             if (relayFactory != null)
             {
                 IDataChannelRelay relay = new BoundDataChannelRelay(channelId, relayFactory.Invoke());
@@ -120,7 +123,10 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
         try
         {
             if (!ChannelIdToRelayMap.TryGetValue(channelId, out IDataChannelRelay? relay))
+            {
+                Debug.WriteLine("CloudPub relay not found for writing, channelId={channelId}");
                 return 0;
+            }
 
             await relay.WriteAsync(data, cancellationToken).ConfigureAwait(false);
             Debug.WriteLine($"CloudPub relay consumed chunk, channelId={channelId}, bytes={data.Length}, total={relay.TotalConsumed}");
@@ -146,7 +152,10 @@ public class RelaysManager(ICloudPubRules rules) : IRelaysManager
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!ChannelIdToRelayMap.TryRemove(channelId, out IDataChannelRelay? relay))
+            {
+                Debug.WriteLine($"CloudPub relay not found for deletion, channelId={channelId}");
                 return;
+            }
 
             await relay.DisposeAsync().ConfigureAwait(false);
             Debug.WriteLine($"CloudPub relay disposed, channelId={channelId}");

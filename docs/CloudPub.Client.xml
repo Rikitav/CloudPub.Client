@@ -111,11 +111,31 @@
             Default in-memory implementation of <see cref="T:CloudPub.Components.ICloudPubRules"/>.
             </summary>
         </member>
-        <member name="M:CloudPub.CloudPubRules.UseRelayForProtocol(CloudPub.Protocol.ProtocolType,System.Func{CloudPub.Components.IDataChannelRelay})">
+        <member name="M:CloudPub.CloudPubRules.AddCustomProtocolRelay(CloudPub.Protocol.ProtocolType,System.Func{CloudPub.Components.IDataChannelRelay})">
             <inheritdoc />
         </member>
-        <member name="M:CloudPub.CloudPubRules.WhatRelayUseForProtocol(CloudPub.Protocol.ProtocolType)">
+        <member name="M:CloudPub.CloudPubRules.GetCustomProtocolRelay(CloudPub.Protocol.ProtocolType)">
             <inheritdoc />
+        </member>
+        <member name="T:CloudPub.Components.IAuthFacility">
+            <summary>
+            Stores an loads client info
+            </summary>
+        </member>
+        <member name="M:CloudPub.Components.IAuthFacility.TryLoadAgentIdAsync(System.Boolean)">
+            <summary>
+            Loads client info.
+            </summary>
+            <param name="userDir"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CloudPub.Components.IAuthFacility.TrySaveAgentIdAsync(System.Boolean,System.String)">
+            <summary>
+            Stores client info.
+            </summary>
+            <param name="userDir"></param>
+            <param name="agentId"></param>
+            <returns></returns>
         </member>
         <member name="T:CloudPub.Components.ICloudPubClient">
             <summary>
@@ -143,14 +163,14 @@
             Defines per-protocol relay factory mappings used by the CloudPub client.
             </summary>
         </member>
-        <member name="M:CloudPub.Components.ICloudPubRules.UseRelayForProtocol(CloudPub.Protocol.ProtocolType,System.Func{CloudPub.Components.IDataChannelRelay})">
+        <member name="M:CloudPub.Components.ICloudPubRules.AddCustomProtocolRelay(CloudPub.Protocol.ProtocolType,System.Func{CloudPub.Components.IDataChannelRelay})">
             <summary>
             Associates a protocol with a relay factory used to create data-channel relays.
             </summary>
             <param name="protocolType">Protocol to bind.</param>
             <param name="relayFactory">Factory that creates a relay instance for that protocol.</param>
         </member>
-        <member name="M:CloudPub.Components.ICloudPubRules.WhatRelayUseForProtocol(CloudPub.Protocol.ProtocolType)">
+        <member name="M:CloudPub.Components.ICloudPubRules.GetCustomProtocolRelay(CloudPub.Protocol.ProtocolType)">
             <summary>
             Resolves the relay factory for a protocol, if it was registered.
             </summary>
@@ -263,6 +283,17 @@
             </summary>
             <param name="message">The message to send.</param>
             <param name="cancellationToken">A token to cancel the operation.</param>
+        </member>
+        <member name="T:CloudPub.LocalAuthFacility">
+            <summary>
+            Default implementation of <see cref="T:CloudPub.Components.IAuthFacility"/>. Stores client info in the local storage.
+            </summary>
+        </member>
+        <member name="M:CloudPub.LocalAuthFacility.TryLoadAgentIdAsync(System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="M:CloudPub.LocalAuthFacility.TrySaveAgentIdAsync(System.Boolean,System.String)">
+            <inheritdoc/>
         </member>
         <member name="T:CloudPub.MessageExchanger">
             <summary>
@@ -434,15 +465,15 @@
             and runs a receive loop dispatching messages to an <see cref="T:CloudPub.Components.IMessageExchanger"/>.
             </summary>
             <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
-            <param name="rules"></param>
+            <param name="authFacility"></param>
         </member>
-        <member name="M:CloudPub.SocketTransport.#ctor(CloudPub.Options.CloudPubClientOptions,CloudPub.Components.ICloudPubRules)">
+        <member name="M:CloudPub.SocketTransport.#ctor(CloudPub.Options.CloudPubClientOptions,CloudPub.Components.IAuthFacility)">
             <summary>
             WebSocket-based transport that performs the agent handshake, sends binary protobuf frames,
             and runs a receive loop dispatching messages to an <see cref="T:CloudPub.Components.IMessageExchanger"/>.
             </summary>
             <param name="options">Server URI, credentials, timeouts, and agent metadata.</param>
-            <param name="rules"></param>
+            <param name="authFacility"></param>
         </member>
         <member name="P:CloudPub.SocketTransport.Options">
             <summary>
