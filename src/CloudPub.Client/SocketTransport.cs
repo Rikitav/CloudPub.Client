@@ -25,11 +25,10 @@ using CloudPub.Components;
 using CloudPub.Options;
 using CloudPub.Protocol;
 using Google.Protobuf;
-using System.ComponentModel;
 using System.Diagnostics;
+using System.Net;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace CloudPub;
 
@@ -314,7 +313,7 @@ public class SocketTransport(CloudPubClientOptions options, IAuthFacility authFa
         {
             AgentId = string.IsNullOrEmpty(agentId) ? Guid.NewGuid().ToString("D") : agentId,
             Token = options.Token ?? "",
-            Hostname = Environment.MachineName,
+            Hostname = Dns.GetHostName(),
             Version = string.IsNullOrEmpty(options.ClientVersion) ? DefaultClientVersion : options.ClientVersion,
             Gui = false,
             Platform = platform,

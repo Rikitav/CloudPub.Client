@@ -129,8 +129,10 @@ internal static class Program
             Auth = auth
         };
 
+        ClientEndpoint clientEndpoint = publishOptions.CreateCleintEndpoint();
         Endpoint endpoint = await client.PublishAsync(publishOptions).ConfigureAwait(false);
-        Console.WriteLine($"Published: {endpoint.Url}");
+        
+        Console.WriteLine($"Published: '{endpoint.Url}' to '{clientEndpoint.LocalPath}:{clientEndpoint.LocalPort}'");
         Console.WriteLine($"GUID: {endpoint.Guid}");
 
         if (options.Flags.Contains("wait"))
